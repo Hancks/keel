@@ -8,6 +8,9 @@
 #   guardian-block          Assembla Tier1(core)+Tier2(tipo)+Tier3(NORTH_STAR)+obiettivo FOCUS -> stdout.
 #   hook-sessionstart       SessionStart: stampa guardian-block su stdout (iniettato nel contesto).
 #   hook-userpromptsubmit   UserPromptSubmit: cattura "segna" -> INBOX; re-inietta il guardian su /add-task.
+#   hook-pretooluse         PreToolUse (Edit|Write): guardie hard-block (R.1 · R.17 · FM9 LEARNED).
+#   learned-approve         FM9: scrive il marker di conferma che SBLOCCA la scrittura sui LEARNED.
+#   learned-approve-clear   FM9: azzera il marker di conferma.
 #   detect-type             Stampa software|non-software (da PROJECT.md). [helper di test]
 #   north-star              Stampa il blocco NORTH_STAR estratto da PROJECT.md. [helper di test]
 
@@ -15,6 +18,8 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 DL="$PROJECT_DIR/design-log"
 HOOKLOG="$PROJECT_DIR/.claude-designlog-hooks.log"
+# FM9: marker di conferma per la scrittura sui LEARNED (nonce + file approvati + scadenza).
+LEARNED_MARKER="$PROJECT_DIR/.locks/learned-write-approved.json"
 
 if command -v jq >/dev/null 2>&1; then HAS_JQ=1; else HAS_JQ=0; fi
 
@@ -115,6 +120,56 @@ deny() {
   exit 0
 }
 
+# FM9 — la scrittura su LEARNED è consentita SOLO se esiste un marker di conferma
+# valido (non scaduto) che include il file bersaglio. Fail-safe: in ogni dubbio
+# (marker assente/scaduto/illeggibile, python3 mancante) → NON approvato → deny.
+learned_approved() {
+  local target="$1"
+  [ -f "$LEARNED_MARKER" ] || return 1
+  python3 - "$LEARNED_MARKER" "$target" <<'PY' 2>/dev/null
+import json, sys, os, time
+try:
+    m = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+try:
+    if float(m.get("expires_at", 0)) < time.time():
+        sys.exit(1)
+except Exception:
+    sys.exit(1)
+def norm(p):
+    try: return os.path.realpath(p)
+    except Exception: return p
+target = norm(sys.argv[2])
+files = [norm(f) for f in m.get("files", [])]
+sys.exit(0 if target in files else 1)
+PY
+}
+
+# Scrive il marker di conferma FM9. Da chiamare SOLO dopo l'OK esplicito dell'utente
+# sulla classificazione proposta dal distillatore. TTL default 30 min.
+cmd_learned_approve() {
+  local ttl=30; local -a files=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --ttl) ttl="${2:-30}"; shift 2 ;;
+      *)     files+=("$1"); shift ;;
+    esac
+  done
+  [ "${#files[@]}" -gt 0 ] || { echo "usage: lock.sh learned-approve <file...> [--ttl <min>]" >&2; exit 2; }
+  mkdir -p "$PROJECT_DIR/.locks" 2>/dev/null
+  python3 - "$LEARNED_MARKER" "$ttl" "${files[@]}" <<'PY'
+import json, sys, os, time, uuid
+marker = sys.argv[1]; ttl = float(sys.argv[2]); files = [os.path.realpath(f) for f in sys.argv[3:]]
+json.dump({"nonce": uuid.uuid4().hex, "files": files,
+          "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+          "expires_at": time.time() + ttl * 60}, open(marker, "w"))
+PY
+  echo "✅ learned-approve: ${#files[@]} file approvati per ${ttl} min → $LEARNED_MARKER"
+}
+
+cmd_learned_approve_clear() { rm -f "$LEARNED_MARKER" 2>/dev/null; echo "🧹 learned-approve azzerato"; }
+
 cmd_hook_pretooluse() {
   local input fp
   input="$(cat)"
@@ -131,6 +186,38 @@ except Exception: pass' 2>/dev/null)"
   if ! ls "$PROJECT_DIR"/.locks/session-*.json >/dev/null 2>&1; then
     deny "Design-Log (R.1): nessuna sessione attiva in .locks/. Esegui /startsession prima di modificare file."
   fi
+  # (v) FM9 — scrittura sui LEARNED (locale + globale) consentita SOLO con conferma esplicita.
+  case "$fp" in
+    */design-log/LEARNED.md|*/LEARNED_GLOBAL/*)
+      if ! learned_approved "$fp"; then
+        deny "Design-Log (R.14/FM9): scrittura su LEARNED bloccata senza conferma. Fai proporre la classificazione dal distillatore (agent learned-distiller), falla CONFERMARE all'utente, poi sblocca con: lock.sh learned-approve \"$fp\". In dubbio la memoria NON si scrive."
+      fi
+      hooklog "PreToolUse ${fp##*/} (LEARNED, conferma OK) → ALLOW"
+      exit 0
+      ;;
+  esac
+  # (vi) Fase 2a — un design-log NON si marca "Approved/Implemented" senza una sezione
+  # "## Antitesi": il rito di confutazione (agent adversarial-critic) non è saltabile in
+  # silenzio. La skill giudica la qualità; questo hook garantisce che il rito ci sia.
+  case "$fp" in
+    */design-log/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*.md)
+      local newtext
+      if [ "$HAS_JQ" -eq 1 ]; then
+        newtext="$(printf '%s' "$input" | jq -r '.tool_input.content // .tool_input.new_string // ""' 2>/dev/null)"
+      else
+        newtext="$(printf '%s' "$input" | python3 -c 'import json,sys
+try:
+    ti=json.load(sys.stdin).get("tool_input",{}); print(ti.get("content") or ti.get("new_string") or "")
+except Exception: pass' 2>/dev/null)"
+      fi
+      if printf '%s' "$newtext" | grep -qE 'Status:[^A-Za-z]*(Approved|Implemented)'; then
+        if ! printf '%s' "$newtext" | grep -qE '^#{2,}[[:space:]]*Antitesi' \
+           && ! grep -qE '^#{2,}[[:space:]]*Antitesi' "$fp" 2>/dev/null; then
+          deny "Design-Log (Fase 2a): stai marcando questo design 'Approved/Implemented' ma manca la sezione '## Antitesi'. Fai girare il confutatore (agent adversarial-critic), scrivi antitesi + sintesi nel design log, POI marca lo stato."
+        fi
+      fi
+      ;;
+  esac
   # (iii) R.17 — lavoro FUORI da design-log/ richiede un obiettivo in corso in FOCUS.
   case "$fp" in
     */design-log/*|"") : ;;   # bookkeeping del metodo o path assente → consentito
@@ -224,7 +311,9 @@ case "${1:-}" in
   hook-posttooluse)      cmd_hook_posttooluse ;;
   hook-precompact)       cmd_hook_precompact ;;
   hook-stop)             cmd_hook_stop ;;
+  learned-approve)       shift; cmd_learned_approve "$@" ;;
+  learned-approve-clear) cmd_learned_approve_clear ;;
   detect-type)           detect_type; echo ;;
   north-star)            north_star ;;
-  *) echo "usage: lock.sh {guardian-block|hook-sessionstart|hook-userpromptsubmit|hook-pretooluse|hook-posttooluse|hook-precompact|hook-stop|detect-type|north-star}" >&2; exit 2 ;;
+  *) echo "usage: lock.sh {guardian-block|hook-sessionstart|hook-userpromptsubmit|hook-pretooluse|hook-posttooluse|hook-precompact|hook-stop|learned-approve|learned-approve-clear|detect-type|north-star}" >&2; exit 2 ;;
 esac
