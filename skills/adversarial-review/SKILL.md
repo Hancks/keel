@@ -1,6 +1,6 @@
 ---
 name: adversarial-review
-description: Use at TWO moments, always. (1) When you have FINISHED a design / plan and are about to ask the user to approve it (e.g. closing the Design section of an /add-task, before the approval checkpoint) — run an adversarial critic that tries to demolish it FIRST. (2) When you have FINISHED implementing something and are about to declare it done — run a verifier + tester FIRST. Turns thesis (design/implementation) into antithesis (critique/verification) into synthesis (what survives). Addresses the loop-bug (FM4): un-confuted design and un-verified implementation are the reason real bugs accumulate.
+description: "Use at TWO moments, always. (1) When you have FINISHED a design / plan and are about to ask the user to approve it (e.g. closing the Design section of an /add-task, before the approval checkpoint) — run an adversarial critic that tries to demolish it FIRST. (2) When you have FINISHED implementing something and are about to declare it done — run a verifier + tester FIRST. Turns thesis into antithesis into synthesis (what survives). Addresses the loop-bug FM4; un-confuted design and un-verified implementation are the reason real bugs accumulate."
 ---
 
 # Adversarial review — tesi → antitesi → sintesi

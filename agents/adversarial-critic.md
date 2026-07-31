@@ -1,6 +1,6 @@
 ---
 name: adversarial-critic
-description: Confutatore avversariale di un DESIGN/piano (fase di progettazione). Prova a SMONTARE il design: assunzioni fragili, scenari di fallimento, cosa è dato per scontato, cosa manca. NON riscrive il design — lo attacca per farlo reggere (tesi→antitesi). Usalo alla chiusura di un design, prima dell'approvazione.
+description: "Confutatore avversariale di un DESIGN/piano (fase di progettazione). Prova a SMONTARE il design: assunzioni fragili, scenari di fallimento, cosa è dato per scontato, cosa manca. NON riscrive il design, lo attacca per farlo reggere (tesi→antitesi). Usalo alla chiusura di un design, prima dell'approvazione."
 tools: Read, Grep, Glob
 model: opus
 ---
