@@ -1,19 +1,19 @@
 # Start Session Command
 
-Carica il contesto del progetto all'inizio di ogni sessione.
+Loads the project context at the start of every session.
 
-## QUESTO COMANDO È OBBLIGATORIO
+## THIS COMMAND IS MANDATORY
 
-L'utente DEVE invocare `/startsession` all'inizio di ogni sessione.
-Se non lo fa, Claude DEVE chiederlo prima di fare qualsiasi altra cosa.
+The user MUST invoke `/startsession` at the start of every session.
+If they don't, Claude MUST ask for it before doing anything else.
 
 ---
 
-## STEP OBBLIGATORI
+## MANDATORY STEPS
 
 ### STEP 0: Preflight `jq`
 
-Tutte le operazioni sui marker passano dallo script `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh`. Lo script usa `jq` come tool primario con fallback `python3` interno (silenzioso, niente prompt aggiuntivi). Il preflight verifica solo lo stato di `jq`. *(Nota permessi: un plugin non può auto-approvarsi i Bash. Per evitare i prompt su ogni invocazione di `lock.sh`, l'utente aggiunge un allow-rule nel proprio settings — vedi README «Permissions» — o approva «don't ask again» al primo prompt.)*
+All marker operations go through the script `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh`. The script uses `jq` as its primary tool with an internal `python3` fallback (silent, no extra prompts). The preflight only checks the state of `jq`. *(Permissions note: a plugin cannot auto-approve its own Bash. To avoid a prompt on every `lock.sh` invocation, the user adds an allow-rule in their own settings — see README "Permissions" — or approves "don't ask again" at the first prompt.)*
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh preflight
@@ -23,20 +23,20 @@ OUTPUT:
 ```
 🔧 Preflight: jq:OK
 ```
-Oppure, se manca:
+Or, if it is missing:
 ```
 🔧 Preflight: jq:MISSING
-⚠️  jq non in PATH. Si consiglia: brew install jq
-   Continuo col fallback python3 interno.
+⚠️  jq not in PATH. Recommended: brew install jq
+   Continuing with the internal python3 fallback.
 ```
 
 ---
 
-### STEP 0.4: Memoria globale — risolvi + auto-bootstrap (standalone, NON blocca)
+### STEP 0.4: Global memory — resolve + auto-bootstrap (standalone, does NOT block)
 
-keel è **standalone**: la memoria globale cross-progetto (`LEARNED_GLOBAL.md` index + cartella `LEARNED_GLOBAL/`) vive in una dir **risolta da `lock.sh`** — default `~/.claude-method`, override con l'env `KEEL_GLOBAL_DIR`. A differenza del vecchio metodo command-based, qui la dir **NON è un pre-requisito bloccante**: se manca viene **auto-creata** (index + 6 domini); se non è creabile (FS read-only / permessi), keel **degrada a solo-locale** e prosegue.
+keel is **standalone**: the cross-project global memory (`LEARNED_GLOBAL.md` index + the `LEARNED_GLOBAL/` folder) lives in a dir **resolved by `lock.sh`** — default `~/.claude-method`, overridable with the env `KEEL_GLOBAL_DIR`. Unlike the old command-based method, here the dir is **NOT a blocking prerequisite**: if it is missing it gets **auto-created** (index + 6 domains); if it cannot be created (read-only FS / permissions), keel **degrades to local-only** and proceeds.
 
-Il bootstrap gira già silenziosamente all'avvio (hook `SessionStart` → `global-bootstrap`). Qui lo si esegue **esplicito e idempotente**, e si risolve la dir da usare nel resto della sessione (letture/scritture LEARNED_GLOBAL):
+The bootstrap already runs silently at startup (hook `SessionStart` → `global-bootstrap`). Here it is run **explicitly and idempotently**, and the dir to use for the rest of the session (LEARNED_GLOBAL reads/writes) is resolved:
 
 ```bash
 GLOBAL_DIR="$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh global-dir)"
@@ -44,32 +44,32 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh global-bootstrap
 test -f "$GLOBAL_DIR/LEARNED_GLOBAL.md" && echo "global:OK ($GLOBAL_DIR)" || echo "global:LOCAL-ONLY"
 ```
 
-**Se OK:**
+**If OK:**
 ```
-🌍 Preflight global: $GLOBAL_DIR OK (auto-bootstrap idempotente · override: KEEL_GLOBAL_DIR)
-```
-
-**Se LOCAL-ONLY (degrado previsto, NON un errore):**
-```
-🌍 Preflight global: dir globale non creabile ($GLOBAL_DIR) → keel prosegue in SOLO-LOCALE
-   (memoria cross-progetto disattivata per questa sessione; il resto del metodo funziona)
+🌍 Preflight global: $GLOBAL_DIR OK (idempotent auto-bootstrap · override: KEEL_GLOBAL_DIR)
 ```
 
-**Prosegui in ENTRAMBI i casi.** Nel resto del comando, dove compare `~/.claude-method/LEARNED_GLOBAL/…`, intendi **`$GLOBAL_DIR/LEARNED_GLOBAL/…`** (la dir risolta qui sopra). Solo-locale = degrado, non stop.
+**If LOCAL-ONLY (an expected degrade, NOT an error):**
+```
+🌍 Preflight global: global dir not creatable ($GLOBAL_DIR) → keel proceeds LOCAL-ONLY
+   (cross-project memory disabled for this session; the rest of the method works)
+```
+
+**Proceed in BOTH cases.** In the rest of the command, wherever `~/.claude-method/LEARNED_GLOBAL/…` appears, read it as **`$GLOBAL_DIR/LEARNED_GLOBAL/…`** (the dir resolved above). Local-only = degrade, not a stop.
 
 ---
 
-### STEP 0.5: Sentinel di sessione (lock cooperativo)
+### STEP 0.5: Session sentinel (cooperative lock)
 
-Verifica e crea il marker che identifica questa sessione. Serve a sapere — anche da altre sessioni Claude attive sullo stesso repo — che cosa sta succedendo. Va eseguito **PRIMA** di qualsiasi altra operazione di lettura/scrittura sul progetto.
+Check and create the marker that identifies this session. It lets you know — even from other Claude sessions active on the same repo — what is happening. It must run **BEFORE** any other read/write operation on the project.
 
-#### 0.5a: Censisci marker esistenti
+#### 0.5a: Census existing markers
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh status
 ```
 
-Restituisce JSON `{markers: [...], file_locks: [...]}`. Schema di ogni marker:
+Returns JSON `{markers: [...], file_locks: [...]}`. Schema of each marker:
 ```json
 {
   "uid": "...",
@@ -80,174 +80,174 @@ Restituisce JSON `{markers: [...], file_locks: [...]}`. Schema di ogni marker:
 }
 ```
 
-`.locks/` vive nella **root del repo** (NON in `design-log/`) ed è in `.gitignore`. Lo script lo crea automaticamente se manca.
+`.locks/` lives in the **repo root** (NOT in `design-log/`) and is in `.gitignore`. The script creates it automatically if missing.
 
-#### 0.5b: Decidi modalità in base ai marker trovati
+#### 0.5b: Decide the mode based on the markers found
 
-**Caso A — Nessun marker presente:**
-Crea il proprio marker `exclusive`:
+**Case A — No marker present:**
+Create your own `exclusive` marker:
 ```bash
-# SESSION_UID, non UID: in zsh UID è read-only → `UID=$(...)` crasha (bad math expr) e non cattura
+# SESSION_UID, not UID: in zsh UID is read-only → `UID=$(...)` crashes (bad math expr) and captures nothing
 SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init); echo "$SESSION_UID"
 ```
 
 OUTPUT:
 ```
-🟢 Nessuna sessione attiva — creo marker EXCLUSIVE
+🟢 No active session — creating an EXCLUSIVE marker
 ✅ .locks/session-{uid}.json
 🆔 UID: {uid}
 ```
 
-**Caso B — Solo marker `shared` esistenti:**
-Calcola l'unione dei `lockedFiles` di tutti i marker shared + dei file `.lock` per-file (dal JSON di `lock.sh status`).
+**Case B — Only `shared` markers exist:**
+Compute the union of the `lockedFiles` of all shared markers + the per-file `.lock`s (from the `lock.sh status` JSON).
 
 OUTPUT:
 ```
-🔄 [N] sessione/i SHARED attiva/e:
+🔄 [N] SHARED session(s) active:
   • UID xxx (host yyy, started zzz) — files: a, b
   • UID www (host kkk, started qqq) — files: c
-🔒 File lockati (unione): a, b, c
+🔒 Locked files (union): a, b, c
 
-Creo comunque il MIO marker EXCLUSIVE (per entrare in modalità shared
-serve esplicito /startsharedsession).
-⚠️ NON modifico nessun file presente nell'unione dei lockati.
+I create my own EXCLUSIVE marker anyway (to enter shared mode you need
+an explicit /startsharedsession).
+⚠️ I will NOT modify any file present in the union of the locked ones.
 ```
-Poi crea il marker come nel Caso A:
+Then create the marker as in Case A:
 ```bash
-# SESSION_UID, non UID: in zsh UID è read-only → `UID=$(...)` crasha (bad math expr) e non cattura
+# SESSION_UID, not UID: in zsh UID is read-only → `UID=$(...)` crashes (bad math expr) and captures nothing
 SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init); echo "$SESSION_UID"
 ```
 
-**Caso C — Almeno un marker `exclusive` (oltre a eventuali shared):**
-⛔ Un'altra sessione esclusiva è già attiva. NON creare alcun marker.
+**Case C — At least one `exclusive` marker (besides any shared ones):**
+⛔ Another exclusive session is already active. Do NOT create any marker.
 
 OUTPUT:
 ```
-⛔ SESSIONE ESCLUSIVA GIÀ ATTIVA — entro in READ-ONLY MODE
-Marker rilevato:
+⛔ EXCLUSIVE SESSION ALREADY ACTIVE — entering READ-ONLY MODE
+Marker detected:
   • UID xxx (host yyy, started zzz, type: exclusive)
 
-⚠️ Per il resto di questa sessione:
-  • NON creo un marker mio
-  • NON modifico ALCUN file (no Edit/Write/Bash con effetti)
-  • Posso solo leggere, spiegare, rispondere
+⚠️ For the rest of this session:
+  • I do NOT create my own marker
+  • I do NOT modify ANY file (no Edit/Write/Bash with effects)
+  • I can only read, explain, answer
 
-Se sai che la sessione è orfana (Claude crashato), rimuovi
-manualmente il marker e riavvia /startsession:
+If you know the session is orphaned (Claude crashed), remove the
+marker manually and restart /startsession:
   rm .locks/session-{uid}.json
 ```
 
-#### 0.5c: Memorizza il proprio UID nella conversazione
+#### 0.5c: Store your own UID in the conversation
 
-Annota e **ribadisci nel riepilogo finale (STEP 4)** il PROPRIO `uid`. Serve a:
-- `/savesession` per rimuovere il marker giusto (`lock.sh end <uid>`)
-- `/startsharedsession` / `/stopsharedsession` per modificare il proprio `lockedFiles` (passato come `--uid <uid>`)
+Note and **restate in the final summary (STEP 4)** your own `uid`. It is needed for:
+- `/savesession` to remove the right marker (`lock.sh end <uid>`)
+- `/startsharedsession` / `/stopsharedsession` to modify your own `lockedFiles` (passed as `--uid <uid>`)
 
 ---
 
-### STEP 1: Verifica struttura COMPLETA
+### STEP 1: Verify the COMPLETE structure
 
-**Scaffold (standalone keel):** se `design-log/` **non esiste** (progetto nuovo mai inizializzato con keel), esegui PRIMA:
+**Scaffold (standalone keel):** if `design-log/` **does not exist** (a new project never initialized with keel), run FIRST:
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh scaffold
 ```
-Crea l'intera struttura `design-log/` — i file-metodo `BEHAVIORS.md`/`METHODOLOGY.md` come **symlink al plugin** (niente `~/.claude-method`) + tutti i template per-progetto (FOCUS/INBOX/TODO/TO_FIX/TO_TEST/DONE/FIXED/progress.old/PROGRESS/PROJECT/BEHAVIORS_LOCAL/PROJECT_UPDATES/LEARNED/issues). Idempotente. Poi prosegui con la verifica sotto.
+It creates the whole `design-log/` structure — the method files `BEHAVIORS.md`/`METHODOLOGY.md` as **symlinks to the plugin** (no `~/.claude-method`) + all the per-project templates (FOCUS/INBOX/TODO/TO_FIX/TO_TEST/DONE/FIXED/progress.old/PROGRESS/PROJECT/BEHAVIORS_LOCAL/PROJECT_UPDATES/LEARNED/issues). Idempotent. Then continue with the check below.
 
-Verifica che esistano TUTTE queste directory e file.
-Se qualcosa manca, CREALO (per `PROJECT_UPDATES.md`, `BEHAVIORS_LOCAL.md`, `FOCUS.md`, `INBOX.md` crea con template vuoto — vedi METHODOLOGY "Template dei file split").
+Verify that ALL of these directories and files exist.
+If something is missing, CREATE it (for `PROJECT_UPDATES.md`, `BEHAVIORS_LOCAL.md`, `FOCUS.md`, `INBOX.md` create them from an empty template — see METHODOLOGY "Templates of the split files").
 
-Per `FOCUS.md`/`INBOX.md` la verifica è scriptata (migrazione organica, idempotente):
+For `FOCUS.md`/`INBOX.md` the check is scripted (organic migration, idempotent):
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh method-check
 ```
-- `verdict=METHOD_OK` → entrambi presenti, prosegui.
-- `verdict=METHOD_MIGRATE` → **crea i file mancanti** dal template (FOCUS = `## In volo` + `*(vuoto)*`; INBOX = `## Da triagiare` + `*(vuoto)*`), poi prosegui. La presenza dei file È il marker di migrazione.
+- `verdict=METHOD_OK` → both present, proceed.
+- `verdict=METHOD_MIGRATE` → **create the missing files** from the template (FOCUS = `## In flight` + `*(empty)*`; INBOX = `## To triage` + `*(empty)*`), then proceed. The presence of the files IS the migration marker.
 
-**Checklist da verificare:**
+**Checklist to verify:**
 - `design-log/`
 - `design-log/sessions/`
 - `design-log/issues/`
 - `design-log/PROJECT.md`
-- `design-log/PROJECT_UPDATES.md` ← contesto/convenzioni/decisioni operative specifici del progetto (creato vuoto se manca)
-- `design-log/BEHAVIORS_LOCAL.md` ← regole comportamentali specifiche del progetto (creato vuoto se manca)
-- `design-log/FOCUS.md` ← 🎯 obiettivo corrente (creato da template se manca — migrazione organica)
-- `design-log/INBOX.md` ← 📥 cattura grezza (creato da template se manca — migrazione organica)
-- `design-log/PROGRESS.md` ← indice leggero (contatori + link ai file split)
-- `design-log/TODO.md` / `TO_FIX.md` / `TO_TEST.md` ← lavoro corrente (creati da template se mancano)
-- `design-log/DONE.md` / `FIXED.md` ← completato recente (creati da template se mancano)
-- `design-log/progress.old.md` ← archivio storico (creato vuoto se manca)
+- `design-log/PROJECT_UPDATES.md` ← project-specific context/conventions/operational decisions (created empty if missing)
+- `design-log/BEHAVIORS_LOCAL.md` ← project-specific behavioral rules (created empty if missing)
+- `design-log/FOCUS.md` ← 🎯 current objective (created from template if missing — organic migration)
+- `design-log/INBOX.md` ← 📥 raw capture (created from template if missing — organic migration)
+- `design-log/PROGRESS.md` ← light index (counters + links to the split files)
+- `design-log/TODO.md` / `TO_FIX.md` / `TO_TEST.md` ← current work (created from template if missing)
+- `design-log/DONE.md` / `FIXED.md` ← recently completed (created from template if missing)
+- `design-log/progress.old.md` ← historical archive (created empty if missing)
 - `design-log/METHODOLOGY.md`
-- `design-log/BEHAVIORS.md` ← CRITICO: regole comportamentali generali
-- `design-log/LEARNED.md` ← memoria locale del progetto
+- `design-log/BEHAVIORS.md` ← CRITICAL: general behavioral rules
+- `design-log/LEARNED.md` ← the project's local memory
 - `design-log/issues/_INDEX.md`
-- almeno un file `design-log/sessions/YYYY-MM-DD-HH-MM.md` (la sessione più recente per nome)
+- at least one `design-log/sessions/YYYY-MM-DD-HH-MM.md` file (the most recent session by name)
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📁 Verifica struttura:
+📁 Structure check:
 ✅ design-log/
 ✅ design-log/sessions/
 ✅ design-log/issues/
 ✅ PROJECT.md
 ✅ PROJECT_UPDATES.md
 ✅ BEHAVIORS_LOCAL.md
-✅ FOCUS.md · INBOX.md (method-check: [METHOD_OK | METHOD_MIGRATE → creati])
-✅ PROGRESS.md (indice)
+✅ FOCUS.md · INBOX.md (method-check: [METHOD_OK | METHOD_MIGRATE → created])
+✅ PROGRESS.md (index)
 ✅ TODO.md · TO_FIX.md · TO_TEST.md · DONE.md · FIXED.md · progress.old.md (split tracking)
 ✅ METHODOLOGY.md
 ✅ BEHAVIORS.md
 ✅ LEARNED.md
 ✅ issues/_INDEX.md
-✅ sessions/[file più recente per nome]
+✅ sessions/[most recent file by name]
 ```
 
-Se qualcosa manca, mostra:
+If something is missing, show:
 ```
-❌ [file/cartella] → CREATO
+❌ [file/folder] → CREATED
 ```
 
 ---
 
-### STEP 1.7: 🚦 GATE migrazione/lettura tracking (FORZANTE — non skippabile)
+### STEP 1.7: 🚦 GATE tracking migration/reading (FORCING — not skippable)
 
-> Questo gate esiste perché la regola "leggi il TODO fino in fondo" come semplice prosa veniva saltata (vedi `BEHAVIORS.md` Regola 1: *"non segui la metodologia se non sei forzato"*). Incidente reale 2026-06-02: PROGRESS.md monolitico da 1022 righe, lette solo le prime 170, `## TODO` in coda (riga 936) saltato. Qui la condizione è verificata da **script** e l'azione è **BLOCCANTE**, non affidata alla buona volontà.
+> This gate exists because the rule "read the TODO all the way through" as plain prose was being skipped (see `BEHAVIORS.md` Rule 1: *"you don't follow the methodology unless you are forced"*). Real incident 2026-06-02: a monolithic PROGRESS.md of 1022 lines, only the first 170 read, `## TODO` at the bottom (line 936) skipped. Here the condition is checked by **script** and the action is **BLOCKING**, not left to good will.
 
-Esegui:
+Run:
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh progress-check
 ```
 
-Interpreta il campo `verdict`:
+Interpret the `verdict` field:
 
-- **`verdict=MIGRATED`** → tracking già split. Procedi: in STEP 3 leggerai `TODO.md` · `TO_FIX.md` · `TO_TEST.md` **per intero**.
-- **`verdict=PROGRESS_MISSING`** → progetto nuovo/senza PROGRESS. Procedi (STEP 1 ha creato i template).
-- **`verdict=MONOLITH_SMALL`** → `PROGRESS.md` è monolitico ma piccolo (≤ `threshold` righe). NON serve migrare ora, MA in STEP 3 **leggi `PROGRESS.md` PER INTERO** (Done e Todo stanno lì; il Todo può essere in coda). Suggerisci all'utente la migrazione quando comodo.
-- **`verdict=MIGRATE_REQUIRED`** → ⛔ **STOP. Migrazione OBBLIGATORIA prima di continuare.** È un monolite grande (> `threshold` righe) che tiene il lavoro corrente in coda: leggerlo solo in cima fa saltare il TODO. **NON** proseguire a STEP 2+ e **NON** produrre il riepilogo STEP 4 finché non hai migrato.
+- **`verdict=MIGRATED`** → tracking already split. Proceed: in STEP 3 you will read `TODO.md` · `TO_FIX.md` · `TO_TEST.md` **in full**.
+- **`verdict=PROGRESS_MISSING`** → new project / no PROGRESS. Proceed (STEP 1 created the templates).
+- **`verdict=MONOLITH_SMALL`** → `PROGRESS.md` is monolithic but small (≤ `threshold` lines). No need to migrate now, BUT in STEP 3 **read `PROGRESS.md` IN FULL** (Done and Todo are there; the Todo may be at the bottom). Suggest the migration to the user when convenient.
+- **`verdict=MIGRATE_REQUIRED`** → ⛔ **STOP. Migration MANDATORY before continuing.** It is a large monolith (> `threshold` lines) that keeps the current work at the bottom: reading only the top skips the TODO. Do **NOT** proceed to STEP 2+ and do **NOT** produce the STEP 4 summary until you have migrated.
 
-  Procedura di migrazione (eseguila **TU**, con giudizio — non esiste auto-slicer affidabile per formati eterogenei):
-  1. **Leggi `PROGRESS.md` PER INTERO**, a blocchi con offset (file grande → una sola Read si tronca). Devi vedere ogni sezione, incluso il `## TODO` in fondo.
-  2. Spezza in (conserva OGNI voce — niente perdite; verifica contando le entry `### ` prima/dopo):
-     - `DONE.md` ← voci `### <data>` di lavoro completato **recente**.
-     - `progress.old.md` ← voci completate **più vecchie** (archivio storico).
-     - `FIXED.md` ← bug risolti (`✅ RISOLTO …`).
-     - `TO_FIX.md` ← bug ancora **aperti**.
-     - `TO_TEST.md` ← "da validare a runtime".
-     - `TODO.md` ← tutto il **lavoro da fare** (sezione `## TODO`, priorità 🔴/🟡/🟢). **È il file a priorità di lettura.**
-     - `PROGRESS.md` ← riscrivilo come **indice leggero**: contatori + link ai file split + "Stato rapido" + Quick Links.
-  3. **Ri-esegui `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh progress-check`**: deve dare `verdict=MIGRATED`. Solo allora prosegui.
+  Migration procedure (do it **YOURSELF**, with judgment — there is no reliable auto-slicer for heterogeneous formats):
+  1. **Read `PROGRESS.md` IN FULL**, in blocks with offsets (a large file → a single Read gets truncated). You must see every section, including the `## TODO` at the bottom.
+  2. Split into (preserve EVERY item — no losses; verify by counting the `### ` entries before/after):
+     - `DONE.md` ← `### <date>` entries of **recently** completed work.
+     - `progress.old.md` ← **older** completed entries (historical archive).
+     - `FIXED.md` ← fixed bugs (`✅ RESOLVED …`).
+     - `TO_FIX.md` ← still **open** bugs.
+     - `TO_TEST.md` ← "to validate at runtime".
+     - `TODO.md` ← all the **work to do** (the `## TODO` section, priority 🔴/🟡/🟢). **This is the priority file to read.**
+     - `PROGRESS.md` ← rewrite it as a **light index**: counters + links to the split files + "Quick status" + Quick Links.
+  3. **Re-run `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh progress-check`**: it must give `verdict=MIGRATED`. Only then proceed.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🚦 Gate tracking: verdict=[…] · PROGRESS.md [N] righe · split_populated=[yes|no]
-[se MIGRATE_REQUIRED] → migrazione eseguita: DONE([N]) · progress.old([N]) · FIXED([N]) · TO_FIX([N]) · TO_TEST([N]) · TODO([N]); re-check ⇒ MIGRATED ✅
-[altrimenti] → nessuna migrazione necessaria
+🚦 Tracking gate: verdict=[…] · PROGRESS.md [N] lines · split_populated=[yes|no]
+[if MIGRATE_REQUIRED] → migration done: DONE([N]) · progress.old([N]) · FIXED([N]) · TO_FIX([N]) · TO_TEST([N]) · TODO([N]); re-check ⇒ MIGRATED ✅
+[otherwise] → no migration needed
 ```
 
 ---
 
 ### STEP 1.8: 🎯 FOCUS-first + INBOX surface (BEHAVIORS R.15/R.17)
 
-> `FOCUS.md` (obiettivo corrente) si legge **per PRIMO** — il lavoro parte da lì, non dal backlog né dall'ultimo messaggio in chat. `INBOX.md` può contenere richieste catturate ma non ancora triagate da sessioni precedenti: vanno **fatte emergere** subito.
+> `FOCUS.md` (the current objective) is read **FIRST** — the work starts from there, not from the backlog nor from the last chat message. `INBOX.md` may contain requests captured but not yet triaged in previous sessions: they must be **surfaced** right away.
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh focus-check
@@ -255,497 +255,497 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh inbox-check
 ```
 
 - **`focus-check`**:
-  - `verdict=FOCUS_OK` → **leggi `FOCUS.md` PER INTERO** ora. È la base del riepilogo (STEP 4) e del "prossimo passo".
-  - `verdict=FOCUS_EMPTY` → FOCUS esiste ma è vuoto: nessun obiettivo corrente fissato. Nel riepilogo proponi di popolarlo (dal primo 🔴 di TODO).
-  - `verdict=FOCUS_MISSING` → STEP 1 doveva crearlo; crealo ora da template, poi prosegui.
-  - Leggi anche `focus_lines`/`focus_bloat` (regola 2026-07-14 «FOCUS si pota»): se `focus_bloat=yes` (oltre `focus_bloat_threshold`, default 40 righe) → **segnala nel riepilogo** «⚠️ FOCUS oltre soglia ([N] righe) → va potato: lo forza `/savesession` (STEP 2b-bis)». A inizio sessione NON si riscrive FOCUS (si legge); la pota è compito della chiusura.
-- **`inbox-check`**: se `inbox_untriaged > 0`, **leggi `INBOX.md`** e tieni quelle voci pronte da segnalare nel riepilogo (vanno triagate, non dimenticate). Se `inbox_residue > 0` (righe che non sono catture aperte: voci spuntate, annotazioni «✅ fatto»): sono **residui di triage-sul-posto** — regola 2026-07-14 «il triage SPOSTA» — segnalali nel riepilogo: andranno SPOSTATI nel file giusto al prossimo triage (`/savesession` lo forza).
-- **Rilevazione MULTISESSIONE (BEHAVIORS R.9)**: mentre leggi `FOCUS.md`, controlla se contiene il marcatore `⚠️ MULTISESSIONE {data}` (lo scrive `/savesession` quando la tornata ha avuto sessioni **in parallelo** che scrivono lo stesso FOCUS senza vedersi). **Se c'è**: l'ultima sessione **per nome** NON basta e può nascondere il lavoro/handoff più importante (es. è una demo chiusa 20 min dopo la sessione che conta) → **memorizza le date indicate** e in **STEP 3 leggi TUTTE le sessioni di quelle date**, non solo l'ultima. I tag `⟨sessione … · {data}⟩` sulle singole voci di FOCUS dicono da quale sessione viene ciascuna indicazione.
+  - `verdict=FOCUS_OK` → **read `FOCUS.md` IN FULL** now. It is the basis of the summary (STEP 4) and of the "next step".
+  - `verdict=FOCUS_EMPTY` → FOCUS exists but is empty: no current objective set. In the summary, propose to populate it (from the first 🔴 of TODO).
+  - `verdict=FOCUS_MISSING` → STEP 1 should have created it; create it now from the template, then proceed.
+  - Also read `focus_lines`/`focus_bloat` (2026-07-14 rule "FOCUS is pruned"): if `focus_bloat=yes` (over `focus_bloat_threshold`, default 40 lines) → **flag it in the summary** "⚠️ FOCUS over threshold ([N] lines) → needs pruning: `/savesession` forces it (STEP 2b-bis)". At the start of a session FOCUS is NOT rewritten (it is read); pruning is the closing's job.
+- **`inbox-check`**: if `inbox_untriaged > 0`, **read `INBOX.md`** and keep those items ready to flag in the summary (they must be triaged, not forgotten). If `inbox_residue > 0` (lines that are not open captures: checked items, "✅ done" annotations): they are **in-place triage residue** — the 2026-07-14 rule "triage MOVES" — flag them in the summary: they will need to be MOVED into the right file at the next triage (`/savesession` forces it).
+- **MULTISESSION detection (BEHAVIORS R.9)**: while reading `FOCUS.md`, check whether it contains the marker `⚠️ MULTISESSION {date}` (written by `/savesession` when the round had **parallel** sessions writing the same FOCUS without seeing each other). **If it is there**: the last session **by name** is NOT enough and may hide the most important work/handoff (e.g. it is a demo closed 20 min after the session that matters) → **memorize the given dates** and in **STEP 3 read ALL the sessions of those dates**, not just the last one. The tags `⟨session … · {date}⟩` on the individual FOCUS items say which session each indication comes from.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🎯 FOCUS: [obiettivo corrente — voce 🔄 in corso, oppure "vuoto"] (focus-check: [FOCUS_OK|FOCUS_EMPTY|FOCUS_MISSING→creato] · [N] righe[ · ⚠️ oltre soglia → pota a /savesession])
-📥 INBOX: [N] voci non triagiate [→ elenco breve] (oppure: vuota) [· ⚠️ [R] residui annotati da SPOSTARE al prossimo triage]
-🧵 MULTISESSIONE: [rilevato marcatore per {date} → in STEP 3 leggo TUTTE le sessioni di quelle date | nessun marcatore, leggo solo l'ultima per nome]
-```
-
----
-
-### STEP 2: Leggi BEHAVIORS + BEHAVIORS_LOCAL + LEARNED locale + LEARNED_GLOBAL + PROJECT_UPDATES
-
-Leggi SEMPRE questi cinque file per primi (ordine importante):
-
-1. `design-log/BEHAVIORS.md` — regole comportamentali generali del metodo
-2. `design-log/BEHAVIORS_LOCAL.md` — regole comportamentali specifiche di questo progetto
-3. `design-log/LEARNED.md` — memoria di apprendimento locale del progetto
-4. **Memoria globale cross-progetto** in `~/.claude-method/LEARNED_GLOBAL/` (dal 2026-06-05 è una cartella per dominio, NON più un file unico):
-   - SEMPRE: `~/.claude-method/LEARNED_GLOBAL.md` (index/manifest) + `LEARNED_GLOBAL/general.md` + `LEARNED_GLOBAL/preferenze.md`
-   - CONDIZIONALE (in base al Tech Stack di PROJECT.md, letto a STEP 2.5/3): carica SOLO i file dominio pertinenti — `software-apple.md` (Swift/iOS/macOS), `software-web.md` (web/backend/cloud), `software-general.md` (qualsiasi codice/git/bash/build), `design.md` (UX/visuale), `research.md`/`writing.md` se esistono. La mappa stack→domini è nell'index.
-   - Poiché lo stack si conosce solo dopo PROJECT.md, leggi ORA index + general + preferenze; carica i domini condizionali **subito dopo** aver letto PROJECT.md (STEP 2.5/3). Un progetto non-software carica solo index + general + preferenze.
-5. `design-log/PROJECT_UPDATES.md` — contesto/convenzioni/decisioni operative specifici di questo progetto (può essere vuoto, è ok)
-
-**OUTPUT OBBLIGATORIO:**
-```
-📖 File base letti:
-✅ BEHAVIORS.md ([N] righe) ← REGOLE COMPORTAMENTALI GENERALI
-✅ BEHAVIORS_LOCAL.md ([N] righe) ← REGOLE COMPORTAMENTALI LOCALI [oppure: VUOTO]
-✅ LEARNED.md ([N] righe) ← MEMORIA LOCALE
-✅ LEARNED_GLOBAL.md (index) + general.md + preferenze.md ← MEMORIA GLOBALE (sempre)
-✅ LEARNED_GLOBAL/<domini condizionali>.md ← caricati per stack: [elenco, es. software-apple] [oppure: solo sempre-caricati]
-✅ PROJECT_UPDATES.md ([N] righe) ← CONTESTO/CONVENZIONI/DECISIONI OPERATIVE LOCALI [oppure: VUOTO]
+🎯 FOCUS: [current objective — 🔄 in-progress item, or "empty"] (focus-check: [FOCUS_OK|FOCUS_EMPTY|FOCUS_MISSING→created] · [N] lines[ · ⚠️ over threshold → prune at /savesession])
+📥 INBOX: [N] untriaged items [→ short list] (or: empty) [· ⚠️ [R] annotated residue to MOVE at the next triage]
+🧵 MULTISESSION: [marker detected for {date} → in STEP 3 I read ALL the sessions of those dates | no marker, I read only the last by name]
 ```
 
 ---
 
-### STEP 2.5: 🔍 GATE - Leggi PROJECT.md e valuta se vuoto
+### STEP 2: Read BEHAVIORS + BEHAVIORS_LOCAL + local LEARNED + LEARNED_GLOBAL + PROJECT_UPDATES
 
-Leggi `design-log/PROJECT.md` e VALUTA se contiene informazioni reali sul progetto.
+ALWAYS read these five files first (order matters):
 
-**PROJECT.md è considerato VUOTO se:**
-- Non esiste
-- Esiste ma ha 0 righe di contenuto
-- Esiste ma contiene SOLO: titolo (`# ...`), placeholder (`[...]`), template non compilato, commenti, righe vuote
-- Non ci sono almeno 2 righe con contenuto informativo reale che descrivano il progetto
+1. `design-log/BEHAVIORS.md` — the method's general behavioral rules
+2. `design-log/BEHAVIORS_LOCAL.md` — this project's specific behavioral rules
+3. `design-log/LEARNED.md` — the project's local learning memory
+4. **Cross-project global memory** in `~/.claude-method/LEARNED_GLOBAL/` (since 2026-06-05 it is a folder per domain, NOT a single file anymore):
+   - ALWAYS: `~/.claude-method/LEARNED_GLOBAL.md` (index/manifest) + `LEARNED_GLOBAL/general.md` + `LEARNED_GLOBAL/preferences.md`
+   - CONDITIONAL (based on the Tech Stack in PROJECT.md, read at STEP 2.5/3): load ONLY the relevant domain files — `software-apple.md` (Swift/iOS/macOS), `software-web.md` (web/backend/cloud), `software-general.md` (any code/git/bash/build), `design.md` (UX/visual), `research.md`/`writing.md` if they exist. The stack→domains map is in the index.
+   - Since the stack is only known after PROJECT.md, read NOW the index + general + preferences; load the conditional domains **right after** reading PROJECT.md (STEP 2.5/3). A non-software project loads only index + general + preferences.
+5. `design-log/PROJECT_UPDATES.md` — this project's specific context/conventions/operational decisions (may be empty, that is ok)
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔍 Valutazione PROJECT.md:
-📄 Stato: [POPOLATO | VUOTO]
+📖 Base files read:
+✅ BEHAVIORS.md ([N] lines) ← GENERAL BEHAVIORAL RULES
+✅ BEHAVIORS_LOCAL.md ([N] lines) ← LOCAL BEHAVIORAL RULES [or: EMPTY]
+✅ LEARNED.md ([N] lines) ← LOCAL MEMORY
+✅ LEARNED_GLOBAL.md (index) + general.md + preferences.md ← GLOBAL MEMORY (always)
+✅ LEARNED_GLOBAL/<conditional domains>.md ← loaded for the stack: [list, e.g. software-apple] [or: only the always-loaded ones]
+✅ PROJECT_UPDATES.md ([N] lines) ← LOCAL CONTEXT/CONVENTIONS/OPERATIONAL DECISIONS [or: EMPTY]
 ```
 
-**Se POPOLATO** → vai a STEP 3 (flusso normale)
-**Se VUOTO** → vai a STEP P1 (Project Discovery Mode) ⚠️ IL FLUSSO NORMALE SI INTERROMPE
+---
+
+### STEP 2.5: 🔍 GATE - Read PROJECT.md and assess whether it is empty
+
+Read `design-log/PROJECT.md` and ASSESS whether it contains real information about the project.
+
+**PROJECT.md is considered EMPTY if:**
+- It does not exist
+- It exists but has 0 lines of content
+- It exists but contains ONLY: a title (`# ...`), placeholders (`[...]`), an uncompiled template, comments, empty lines
+- There are not at least 2 lines with real informative content describing the project
+
+**MANDATORY OUTPUT:**
+```
+🔍 PROJECT.md assessment:
+📄 State: [POPULATED | EMPTY]
+```
+
+**If POPULATED** → go to STEP 3 (normal flow)
+**If EMPTY** → go to STEP P1 (Project Discovery Mode) ⚠️ THE NORMAL FLOW IS INTERRUPTED
 
 ---
 
 ## 🔍 PROJECT DISCOVERY MODE
 
-> Questo blocco si attiva SOLO se PROJECT.md è vuoto.
-> Il flusso normale di /startsession è INTERROTTO fino al completamento.
+> This block activates ONLY if PROJECT.md is empty.
+> The normal /startsession flow is INTERRUPTED until it completes.
 
-### STEP P1: Analizza il repository
+### STEP P1: Analyze the repository
 
-Esamina la directory del progetto per capire se esiste già codice/contenuto.
+Examine the project directory to understand whether code/content already exists.
 
-**Criteri per "progetto esistente":**
-- Ci sono file sorgente (*.py, *.js, *.ts, *.swift, *.go, *.rs, *.java, *.c, *.cpp, etc.)
-- Ci sono file di progetto (package.json, Cargo.toml, requirements.txt, Makefile, *.xcodeproj, etc.)
-- Ci sono asset, documenti, configurazioni significative
-- Qualsiasi struttura di progetto riconoscibile OLTRE ai file del design-log system
+**Criteria for "existing project":**
+- There are source files (*.py, *.js, *.ts, *.swift, *.go, *.rs, *.java, *.c, *.cpp, etc.)
+- There are project files (package.json, Cargo.toml, requirements.txt, Makefile, *.xcodeproj, etc.)
+- There are assets, documents, significant configurations
+- Any recognizable project structure BEYOND the design-log system files
 
-**Criteri per "progetto nuovo":**
-- La directory contiene SOLO i file del design-log system (.claude/, design-log/, CLAUDE.md)
-- Nessun file sorgente, nessuna struttura di progetto
+**Criteria for "new project":**
+- The directory contains ONLY the design-log system files (.claude/, design-log/, CLAUDE.md)
+- No source file, no project structure
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔍 Analisi repository:
-📂 Tipo: [PROGETTO ESISTENTE | PROGETTO NUOVO]
-📄 Evidenze: [elenco breve di cosa è stato trovato o "solo file design-log"]
+🔍 Repository analysis:
+📂 Type: [EXISTING PROJECT | NEW PROJECT]
+📄 Evidence: [short list of what was found or "only design-log files"]
 ```
 
-**Se PROGETTO ESISTENTE** → vai a STEP E1
-**Se PROGETTO NUOVO** → vai a STEP N1
+**If EXISTING PROJECT** → go to STEP E1
+**If NEW PROJECT** → go to STEP N1
 
 ---
 
-### Ramo A: PROGETTO ESISTENTE
+### Branch A: EXISTING PROJECT
 
-#### STEP E1: Analisi profonda
+#### STEP E1: Deep analysis
 
-Claude deve raggiungere una comprensione sufficiente a gestire il progetto IN AUTONOMIA.
+Claude must reach an understanding sufficient to manage the project AUTONOMOUSLY.
 
-**Analizzare IN PROFONDITÀ:**
+**Analyze IN DEPTH:**
 
-1. **Struttura directory** - layout cartelle, organizzazione moduli
-2. **Stack tecnologico** - linguaggi, framework, dipendenze (da package manager, config files)
-3. **Architettura** - pattern (MVC, MVVM, microservizi, etc.), entry point, flusso dati
-4. **Codice sorgente** - leggere i file principali, capire la logica core, i modelli dati, le API
-5. **Configurazioni** - build system, CI/CD, env, database
-6. **Test** - framework test, copertura, come eseguirli
-7. **Documentazione esistente** - README, commenti, doc inline
+1. **Directory structure** - folder layout, module organization
+2. **Technology stack** - languages, frameworks, dependencies (from the package manager, config files)
+3. **Architecture** - patterns (MVC, MVVM, microservices, etc.), entry point, data flow
+4. **Source code** - read the main files, understand the core logic, the data models, the APIs
+5. **Configurations** - build system, CI/CD, env, database
+6. **Tests** - test framework, coverage, how to run them
+7. **Existing documentation** - README, comments, inline docs
 
-**Se il progetto è grande (>50 file sorgente):**
-Usare Agent per parallelizzare l'analisi in sub-task:
-- Agent 1: struttura + dipendenze + config
-- Agent 2: architettura + codice core + modelli dati
-- Agent 3: test + docs + build system
+**If the project is large (>50 source files):**
+Use Agent to parallelize the analysis into sub-tasks:
+- Agent 1: structure + dependencies + config
+- Agent 2: architecture + core code + data models
+- Agent 3: tests + docs + build system
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔬 Analisi profonda completata:
+🔬 Deep analysis completed:
 
-📂 **Struttura**: [descrizione layout]
-🛠️ **Stack**: [linguaggi, framework, dipendenze principali]
-🏗️ **Architettura**: [pattern, moduli principali, flusso dati]
-📝 **Codice core**: [file principali e loro ruolo]
-⚙️ **Config/Build**: [come si builda, si esegue, si deploya]
-🧪 **Test**: [framework, come eseguirli]
-📖 **Docs**: [documentazione trovata]
+📂 **Structure**: [layout description]
+🛠️ **Stack**: [main languages, frameworks, dependencies]
+🏗️ **Architecture**: [patterns, main modules, data flow]
+📝 **Core code**: [main files and their role]
+⚙️ **Config/Build**: [how it builds, runs, deploys]
+🧪 **Tests**: [framework, how to run them]
+📖 **Docs**: [documentation found]
 ```
 
 ---
 
-#### STEP E2: Presenta deduzioni
+#### STEP E2: Present the deductions
 
-Mostra all'utente cosa ha dedotto e chiedi conferma.
+Show the user what you deduced and ask for confirmation.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🧠 Ecco cosa ho dedotto dal progetto:
+🧠 Here is what I deduced about the project:
 
-📂 **Nome progetto**: [dedotto o da confermare]
-🎯 **Scopo**: [cosa fa il progetto, che problema risolve]
-👥 **Target**: [a chi è destinato]
-🛠️ **Stack tecnologico**: [elenco completo]
-🏗️ **Architettura**: [descrizione pattern e organizzazione]
-📋 **Funzionalità principali**:
+📂 **Project name**: [deduced or to confirm]
+🎯 **Purpose**: [what the project does, what problem it solves]
+👥 **Target**: [who it is for]
+🛠️ **Technology stack**: [full list]
+🏗️ **Architecture**: [description of pattern and organization]
+📋 **Main features**:
    1. [feature 1]
    2. [feature 2]
    3. [feature N]
 
-📊 **Stato attuale del progetto**:
-   - [cosa sembra completato]
-   - [cosa sembra in corso]
-   - [cosa sembra mancante o da fare]
+📊 **Current project state**:
+   - [what seems completed]
+   - [what seems in progress]
+   - [what seems missing or to do]
 
-❓ **Domande/dubbi**:
-   - [cosa non è chiaro dall'analisi]
-   - [dove servono chiarimenti]
+❓ **Questions/doubts**:
+   - [what is not clear from the analysis]
+   - [where clarification is needed]
 ```
 
 ---
 
-#### 🛑 STEP E3: FERMATI - Chiedi conferma
+#### 🛑 STEP E3: STOP - Ask for confirmation
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🛑 CHECKPOINT - CONFERMA DEDUZIONI
+🛑 CHECKPOINT - CONFIRM DEDUCTIONS
 
-Le deduzioni sopra sono corrette? Correggimi dove sbaglio.
-In particolare conferma:
-- Scopo del progetto
-- Target
-- Funzionalità principali
-- Stato attuale
+Are the deductions above correct? Correct me where I am wrong.
+In particular, confirm:
+- The project's purpose
+- The target
+- The main features
+- The current state
 
-Eventuali correzioni o integrazioni?
+Any corrections or additions?
 ```
 
-**NON procedere finché l'utente non conferma o corregge.**
+**Do NOT proceed until the user confirms or corrects.**
 
 ---
 
-#### STEP E4: Popola file
+#### STEP E4: Populate the files
 
-Dopo conferma, scrivi:
-- **PROJECT.md** - compilato con tutte le informazioni confermate
-- **PROGRESS.md** - con DONE (lavoro già fatto dedotto) e TODO (cose da fare dedotte), solo se confermati
+After confirmation, write:
+- **PROJECT.md** - filled in with all the confirmed information
+- **PROGRESS.md** - with DONE (deduced already-done work) and TODO (deduced to-do items), only if confirmed
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📝 File aggiornati:
-✅ PROJECT.md - compilato ([N] righe)
-✅ PROGRESS.md - aggiornato con [N] DONE e [N] TODO dedotti
+📝 Files updated:
+✅ PROJECT.md - filled in ([N] lines)
+✅ PROGRESS.md - updated with [N] DONE and [N] TODO deduced
 ```
 
-**→ Vai a STEP 3 (riprendi flusso normale)**
+**→ Go to STEP 3 (resume the normal flow)**
 
 ---
 
-### Ramo B: PROGETTO NUOVO
+### Branch B: NEW PROJECT
 
-#### STEP N1: Domande guidate
+#### STEP N1: Guided questions
 
-Claude pone domande adattive per definire il progetto. Set minimo, ma Claude DEVE aggiungere domande contestuali in base al tipo di progetto che emerge.
+Claude asks adaptive questions to define the project. A minimal set, but Claude MUST add contextual questions based on the type of project that emerges.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🆕 Nuovo progetto! Ho bisogno di alcune informazioni per partire.
+🆕 New project! I need some information to get started.
 
-❓ Domande:
+❓ Questions:
 
-1. **Scopo**: Cosa deve fare questo progetto? Che problema risolve?
-2. **Target**: A chi è destinato? (utenti finali, sviluppatori, team interno, etc.)
-3. **Funzionalità principali**: Quali sono le feature core che vuoi?
-4. **Tecnologia**: Hai preferenze su linguaggio/framework? Vincoli tecnici?
-5. **Interfaccia**: Serve un'interfaccia utente? Di che tipo? (web, mobile, CLI, desktop, nessuna)
-6. **Vincoli**: Deadline, dipendenze esterne, integrazioni con altri sistemi?
+1. **Purpose**: What should this project do? What problem does it solve?
+2. **Target**: Who is it for? (end users, developers, internal team, etc.)
+3. **Main features**: What are the core features you want?
+4. **Technology**: Do you have preferences on language/framework? Technical constraints?
+5. **Interface**: Is a user interface needed? What kind? (web, mobile, CLI, desktop, none)
+6. **Constraints**: Deadline, external dependencies, integrations with other systems?
 ```
 
-Claude DEVE aggiungere domande extra se il contesto lo richiede. Esempi:
-- Se l'utente menziona "app mobile" → domande su piattaforma (iOS/Android/cross), design system
-- Se menziona "API" → domande su autenticazione, rate limiting, documentazione
-- Se menziona "gioco" → domande su genere, piattaforma, engine
-- Se non è un progetto software → domande sulla natura specifica (ricerca, documentazione, design, etc.)
+Claude MUST add extra questions if the context calls for it. Examples:
+- If the user mentions "mobile app" → questions about the platform (iOS/Android/cross), design system
+- If they mention "API" → questions about authentication, rate limiting, documentation
+- If they mention "game" → questions about genre, platform, engine
+- If it is not a software project → questions about the specific nature (research, documentation, design, etc.)
 
 ---
 
-#### 🛑 STEP N2: FERMATI - Aspetta risposte
+#### 🛑 STEP N2: STOP - Wait for answers
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
 🛑 CHECKPOINT
 
-Attendo le tue risposte. Rispondi come preferisci - anche in forma libera,
-non devi seguire la numerazione.
+Waiting for your answers. Answer however you like - even in free form,
+you don't have to follow the numbering.
 ```
 
-**NON procedere finché l'utente non risponde.**
+**Do NOT proceed until the user answers.**
 
 ---
 
-#### STEP N3: Popola file
+#### STEP N3: Populate the files
 
-Dopo le risposte, Claude:
-1. Riassume ciò che ha capito e chiede conferma rapida
-2. Dopo conferma, scrive:
-   - **PROJECT.md** - compilato con tutte le informazioni
-   - **PROGRESS.md** - con TODO iniziale basato sulle funzionalità descritte
+After the answers, Claude:
+1. Summarizes what it understood and asks for a quick confirmation
+2. After confirmation, writes:
+   - **PROJECT.md** - filled in with all the information
+   - **PROGRESS.md** - with an initial TODO based on the described features
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📝 File creati:
-✅ PROJECT.md - compilato ([N] righe)
-✅ PROGRESS.md - piano iniziale con [N] TODO
+📝 Files created:
+✅ PROJECT.md - filled in ([N] lines)
+✅ PROGRESS.md - initial plan with [N] TODOs
 ```
 
-**→ Vai a STEP 3 (riprendi flusso normale)**
+**→ Go to STEP 3 (resume the normal flow)**
 
 ---
 
-## FLUSSO NORMALE (continua dopo STEP 2.5 o dopo Discovery)
+## NORMAL FLOW (continues after STEP 2.5 or after Discovery)
 
-### STEP 3: Leggi file rimanenti
+### STEP 3: Read the remaining files
 
-Leggi i file restanti nell'ordine specificato:
+Read the remaining files in the specified order:
 
-1. `design-log/PROJECT.md` - (ri-leggi se appena popolato dalla discovery)
-2. **Stato del progresso (split per-tipo)**:
-   - `design-log/PROGRESS.md` (indice: contatori + link)
-   - `design-log/TODO.md`, `TO_FIX.md`, `TO_TEST.md` - lavoro corrente — **LEGGILI PER INTERO** (priorità, bug aperti, da testare). `TODO.md` è il file a **priorità di lettura**.
-   - `design-log/DONE.md`, `FIXED.md` - completato recente (NON leggere `progress.old.md`: è archivio, solo on-demand)
-   - **NOTA (post-GATE STEP 1.7):** la migrazione del monolite è già stata gestita dal gate. Qui può residuare solo `verdict=MONOLITH_SMALL` (monolite piccolo non migrato): in quel caso leggi `PROGRESS.md` **PER INTERO** — Done e Todo stanno lì, il Todo può essere in coda. **MAI** leggere solo la parte alta di un PROGRESS.md monolitico né dedurre lo stato dalla sola testa del file.
-3. **Sessione/i più recente/i** - Di norma risolvi l'ultima con `ls -1 design-log/sessions/[0-9]*.md | sort | tail -1` e leggila. **MA se STEP 1.8 ha rilevato il marcatore `⚠️ MULTISESSIONE {data}` in `FOCUS.md`** (sessioni in parallelo su quella tornata, che scrivono lo stesso FOCUS senza vedersi): **NON fermarti all'ultima per nome** — leggi **TUTTE** le sessioni di quella/e data/e: `ls -1 design-log/sessions/{data}-*.md`. L'ultima per nome può essere una sessione parallela minore (es. una demo) e nascondere la sessione con il lavoro/handoff più importante. Incrocia i tag `⟨sessione …⟩` di FOCUS con l'`**Session UID**` in cima a ciascun session log per capire chi ha scritto cosa.
-4. `design-log/METHODOLOGY.md` - Come lavorare
-5. `design-log/issues/_INDEX.md` - Issue aperte
+1. `design-log/PROJECT.md` - (re-read it if just populated by the discovery)
+2. **Progress state (split by type)**:
+   - `design-log/PROGRESS.md` (index: counters + links)
+   - `design-log/TODO.md`, `TO_FIX.md`, `TO_TEST.md` - current work — **READ THEM IN FULL** (priorities, open bugs, to test). `TODO.md` is the **priority file to read**.
+   - `design-log/DONE.md`, `FIXED.md` - recently completed (do NOT read `progress.old.md`: it is an archive, on-demand only)
+   - **NOTE (post-GATE STEP 1.7):** the monolith migration is already handled by the gate. Here only `verdict=MONOLITH_SMALL` may remain (a small monolith not migrated): in that case read `PROGRESS.md` **IN FULL** — Done and Todo are there, the Todo may be at the bottom. **NEVER** read only the top part of a monolithic PROGRESS.md nor deduce the state from the head of the file alone.
+3. **Most recent session(s)** - Normally resolve the last one with `ls -1 design-log/sessions/[0-9]*.md | sort | tail -1` and read it. **BUT if STEP 1.8 detected the marker `⚠️ MULTISESSION {date}` in `FOCUS.md`** (parallel sessions in that round, writing the same FOCUS without seeing each other): **do NOT stop at the last by name** — read **ALL** the sessions of that/those date(s): `ls -1 design-log/sessions/{date}-*.md`. The last by name may be a minor parallel session (e.g. a demo) and hide the session with the most important work/handoff. Cross the `⟨session …⟩` tags in FOCUS with the `**Session UID**` at the top of each session log to see who wrote what.
+4. `design-log/METHODOLOGY.md` - How to work
+5. `design-log/issues/_INDEX.md` - Open issues
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📖 File letti:
-✅ PROJECT.md ([N] righe)
-✅ Tracking - PROGRESS.md indice ([N]) · TODO/TO_FIX/TO_TEST ([N]/[N]/[N]) · DONE/FIXED ([N]/[N])
-   (oppure, se non migrato: ✅ PROGRESS.md monolitico ([N] righe) ← FALLBACK, file split vuoti)
-✅ sessions/[file/i letto/i] ([N] righe) ← ultima per nome, oppure TUTTE le sessioni della/e data/e se FOCUS segnala ⚠️ MULTISESSIONE
-✅ METHODOLOGY.md ([N] righe)
-✅ issues/_INDEX.md ([N] righe)
+📖 Files read:
+✅ PROJECT.md ([N] lines)
+✅ Tracking - PROGRESS.md index ([N]) · TODO/TO_FIX/TO_TEST ([N]/[N]/[N]) · DONE/FIXED ([N]/[N])
+   (or, if not migrated: ✅ monolithic PROGRESS.md ([N] lines) ← FALLBACK, split files empty)
+✅ sessions/[file(s) read] ([N] lines) ← the last by name, or ALL the sessions of the date(s) if FOCUS flags ⚠️ MULTISESSION
+✅ METHODOLOGY.md ([N] lines)
+✅ issues/_INDEX.md ([N] lines)
 ```
 
 ---
 
 ### STEP 3.5: Plan awareness (`.plan/`)
 
-Verifica eventuali piani di coordinamento cross-progetto attivi nel sub corrente.
+Check for any active cross-project coordination plans in the current sub.
 
-#### 3.5a: Crea `.plan/` se non esiste
+#### 3.5a: Create `.plan/` if it doesn't exist
 
 ```bash
 mkdir -p .plan .plan/inbox
 ```
-Best effort. Se `.plan/` esisteva già (anche vuota), `mkdir -p` non fa nulla. `.plan/inbox/` è la cartella delle note di handoff cross-progetto in arrivo (vedi 3.5f).
+Best effort. If `.plan/` already existed (even empty), `mkdir -p` does nothing. `.plan/inbox/` is the folder for incoming cross-project handoff notes (see 3.5f).
 
-#### 3.5b: Lista plan attivi
+#### 3.5b: List active plans
 
 ```bash
 ls -1 .plan/*.json 2>/dev/null
 ```
 
-Esclude `.plan/archived/`.
+Excludes `.plan/archived/`.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📋 Plan attivi:
-✅ <N> plan trovati: <list di plan_id>
-   oppure
-⏭️ Nessun plan attivo (zero overhead)
+📋 Active plans:
+✅ <N> plans found: <list of plan_id>
+   or
+⏭️ No active plan (zero overhead)
 ```
 
-Se nessun plan → salta a STEP 4.
+If no plan → skip to STEP 4.
 
-#### 3.5c: Per ogni plan, classifica i task del sub corrente
+#### 3.5c: For each plan, classify the current sub's tasks
 
-Per ogni `.plan/<plan_id>.json`:
-1. Carica il JSON.
-2. Identifica i task con `sub_path` = pwd assoluto del sub corrente. Per il match, normalizza i path (resolve simlink, no trailing slash).
-3. Per ogni task del sub corrente:
-   - **completed**: status = "completed" → mostra ✅
-   - **in_progress**: status = "in_progress" → mostra 🔄 (suggerisci ripresa via design log artifact)
-   - **pending**: verifica le dipendenze. Per ogni `dep_id` in `depends_on`:
-     a. Trova il task con quell'`id` in `tasks[]` (anche se in altro sub)
-     b. Path dell'artifact: `<dep.sub_path>/<dep.artifact>`
-     c. Leggi il design log artifact (se esiste)
-     d. Cerca header `Status: Implemented` (o `Status:** Implemented**`)
-     e. Se trovato → la dipendenza è soddisfatta
-   - Se TUTTE le dipendenze soddisfatte → 🟢 ready
-   - Se almeno una non soddisfatta → ⏳ blocked (mostra quali)
-4. Aggiorna opportunisticamente la copia locale del plan con gli status verificati (write idempotente di `<sub_path>/.plan/<plan_id>.json` con `status` e `started_at`/`completed_at` aggiornati). Se il task del sub corrente ha l'artifact con `Status: Implemented`, marca `completed` (con `completed_at`); se l'artifact esiste ma è `Implementing`/`Draft`, marca `in_progress` (con `started_at`).
+For each `.plan/<plan_id>.json`:
+1. Load the JSON.
+2. Identify the tasks with `sub_path` = the current sub's absolute pwd. For the match, normalize the paths (resolve symlinks, no trailing slash).
+3. For each task of the current sub:
+   - **completed**: status = "completed" → show ✅
+   - **in_progress**: status = "in_progress" → show 🔄 (suggest resuming via the design log artifact)
+   - **pending**: check the dependencies. For each `dep_id` in `depends_on`:
+     a. Find the task with that `id` in `tasks[]` (even if in another sub)
+     b. Artifact path: `<dep.sub_path>/<dep.artifact>`
+     c. Read the design log artifact (if it exists)
+     d. Look for the header `Status: Implemented` (or `Status:** Implemented**`)
+     e. If found → the dependency is satisfied
+   - If ALL dependencies satisfied → 🟢 ready
+   - If at least one not satisfied → ⏳ blocked (show which)
+4. Opportunistically update the local copy of the plan with the verified statuses (idempotent write of `<sub_path>/.plan/<plan_id>.json` with updated `status` and `started_at`/`completed_at`). If the current sub's task has the artifact with `Status: Implemented`, mark it `completed` (with `completed_at`); if the artifact exists but is `Implementing`/`Draft`, mark it `in_progress` (with `started_at`).
 
 #### 3.5d: Auto-archive
 
-Se per il plan TUTTI i task (di tutti i sub, non solo del corrente) risultano `completed` (verificato via artifact, anche cross-sub):
-1. Sposta `.plan/<plan_id>.json` in `.plan/archived/<plan_id>.json` nel sub corrente
-2. Best-effort: tenta lo spostamento anche negli altri `sub_path` raggiungibili via filesystem locale
+If for the plan ALL the tasks (of all subs, not just the current one) are `completed` (verified via artifact, even cross-sub):
+1. Move `.plan/<plan_id>.json` to `.plan/archived/<plan_id>.json` in the current sub
+2. Best-effort: also try the move in the other `sub_path`s reachable via the local filesystem
 3. Output:
 ```
-📦 Plan <plan_id> tutti i task completed → archiviato in .plan/archived/
+📦 Plan <plan_id> all tasks completed → archived in .plan/archived/
 ```
 
-#### 3.5e: Output del riepilogo plan
+#### 3.5e: Plan summary output
 
-Per ogni plan attivo (non archiviato dopo 3.5d):
+For each active plan (not archived after 3.5d):
 ```
 📊 Plan: <plan_id> — <title>
-  Task in questo sub:
+  Tasks in this sub:
   ✅ <id_a>: <title> — completed
   🔄 <id_b>: <title> — in_progress (artifact: <path>)
-  🟢 <id_c>: <title> — pronto (no deps pending)
-  ⏳ <id_d>: <title> — bloccato da: <id_x> (sub <sub_x>)
+  🟢 <id_c>: <title> — ready (no deps pending)
+  ⏳ <id_d>: <title> — blocked by: <id_x> (sub <sub_x>)
 ```
 
-#### 3.5f: Inbox handoff (`.plan/inbox/`)
+#### 3.5f: Handoff inbox (`.plan/inbox/`)
 
-Le note di handoff cross-progetto **in arrivo** vivono in `.plan/inbox/*.md` (convenzione 2026-06-07 — posto unico e prevedibile accanto ai plan, NON in `design-log/`). Elencale:
+The **incoming** cross-project handoff notes live in `.plan/inbox/*.md` (2026-06-07 convention — a single predictable place next to the plans, NOT in `design-log/`). List them:
 ```bash
-ls -1 .plan/inbox/*.md 2>/dev/null   # esclude .plan/inbox/archived/
+ls -1 .plan/inbox/*.md 2>/dev/null   # excludes .plan/inbox/archived/
 ```
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📬 Inbox handoff: <N> note → <lista nomi file>
-   (oppure: ⏭️ Inbox vuota)
+📬 Handoff inbox: <N> notes → <list of file names>
+   (or: ⏭️ Inbox empty)
 ```
 
-Se ci sono note, **leggile** (sono brevi e indirizzate a questo sub) e tienine conto nel riepilogo (STEP 4) e nel prossimo passo suggerito. Una nota già consumata va spostata in `.plan/inbox/archived/` (best-effort) per non risegnalarla alle sessioni future.
+If there are notes, **read them** (they are short and addressed to this sub) and take them into account in the summary (STEP 4) and in the suggested next step. A note already consumed should be moved to `.plan/inbox/archived/` (best-effort) so it isn't re-flagged to future sessions.
 
 ---
 
-### STEP 4: Genera riepilogo
+### STEP 4: Generate the summary
 
-Mostra all'utente che hai CAPITO il contesto.
+Show the user that you UNDERSTOOD the context.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🧠 **REGOLE COMPORTAMENTALI GENERALI** (da BEHAVIORS.md):
-- [regola 1 critica]
-- [regola 2 critica]
-- [regola 3 critica]
+🧠 **GENERAL BEHAVIORAL RULES** (from BEHAVIORS.md):
+- [critical rule 1]
+- [critical rule 2]
+- [critical rule 3]
 
-📌 **REGOLE COMPORTAMENTALI LOCALI** (da BEHAVIORS_LOCAL.md):
-- [regola comportamentale locale 1]
-- [regola comportamentale locale 2]
-- (se BEHAVIORS_LOCAL è vuoto: "⏭️ Nessuna regola comportamentale locale specifica per questo progetto")
+📌 **LOCAL BEHAVIORAL RULES** (from BEHAVIORS_LOCAL.md):
+- [local behavioral rule 1]
+- [local behavioral rule 2]
+- (if BEHAVIORS_LOCAL is empty: "⏭️ No project-specific local behavioral rule")
 
-🗂️ **CONTESTO / CONVENZIONI / DECISIONI OPERATIVE** (da PROJECT_UPDATES.md):
-- [convenzione / decisione operativa 1]
-- [convenzione / decisione operativa 2]
-- (se PROJECT_UPDATES è vuoto: "⏭️ Nessun contesto locale specifico")
+🗂️ **CONTEXT / CONVENTIONS / OPERATIONAL DECISIONS** (from PROJECT_UPDATES.md):
+- [convention / operational decision 1]
+- [convention / operational decision 2]
+- (if PROJECT_UPDATES is empty: "⏭️ No specific local context")
 
-💡 **APPRENDIMENTI CHIAVE** (da LEARNED.md locale):
-- [apprendimento 1 rilevante]
-- [apprendimento 2 rilevante]
+💡 **KEY LEARNINGS** (from local LEARNED.md):
+- [relevant learning 1]
+- [relevant learning 2]
 
-🌍 **APPRENDIMENTI GLOBALI RILEVANTI** (dai file dominio caricati in `~/.claude-method/LEARNED_GLOBAL/`):
-- [apprendimento globale 1, dai domini pertinenti allo stack]
-- [apprendimento globale 2]
-- (mostra max 3-5 voci più rilevanti dai file dominio effettivamente caricati per questo progetto; indica anche quali domini sono stati caricati, es. "domini: general + preferenze + software-apple")
+🌍 **RELEVANT GLOBAL LEARNINGS** (from the domain files loaded in `~/.claude-method/LEARNED_GLOBAL/`):
+- [global learning 1, from the domains relevant to the stack]
+- [global learning 2]
+- (show at most 3-5 most relevant items from the domain files actually loaded for this project; also state which domains were loaded, e.g. "domains: general + preferences + software-apple")
 
-🆔 **Sessione**: UID `{uid}` — type `{exclusive|shared|read-only}` — marker `.locks/session-{uid}.json`
+🆔 **Session**: UID `{uid}` — type `{exclusive|shared|read-only}` — marker `.locks/session-{uid}.json`
 
-📂 **Progetto**: [nome e breve descrizione da PROJECT.md]
-🛠️ **Stack**: [tecnologie da PROJECT.md]
+📂 **Project**: [name and short description from PROJECT.md]
+🛠️ **Stack**: [technologies from PROJECT.md]
 
-🎯 **Obiettivo corrente (FOCUS.md)**: [voce `🔄 in corso` + criterio di "fatto" — oppure "nessuno fissato, da popolare"]
-📥 **INBOX da triagiare**: [N voci → elenco breve | vuota]
+🎯 **Current objective (FOCUS.md)**: [the `🔄 in progress` item + "done" criterion — or "none set, to populate"]
+📥 **INBOX to triage**: [N items → short list | empty]
 
-📊 **Stato attuale**:
-- Ultima sessione: [data dalla sessione piu' recente]
-- Ultimo lavoro: [cosa dalla sessione piu' recente]
-- Issue aperte: [numero da _INDEX.md]
-- Prossima priorità: **[la voce `🔄 in corso` di FOCUS.md; se FOCUS è vuoto, il primo item 🔴 di TODO.md]** (post-GATE il tracking è migrato; se `MONOLITH_SMALL`, dal `## TODO` di `PROGRESS.md` letto PER INTERO). ⚠️ Il lavoro parte da FOCUS (R.17), non dallo "Stato rapido" né dall'ultimo messaggio in chat.
+📊 **Current state**:
+- Last session: [date from the most recent session]
+- Last work: [what from the most recent session]
+- Open issues: [number from _INDEX.md]
+- Next priority: **[the `🔄 in progress` item of FOCUS.md; if FOCUS is empty, the first 🔴 item of TODO.md]** (post-GATE the tracking is migrated; if `MONOLITH_SMALL`, from the `## TODO` of `PROGRESS.md` read IN FULL). ⚠️ Work starts from FOCUS (R.17), not from the "Quick status" nor from the last chat message.
 
-📝 **Dall'ultima sessione**:
-- [punto chiave 1 da Handoff Notes]
-- [punto chiave 2 da Handoff Notes]
+📝 **From the last session**:
+- [key point 1 from the Handoff Notes]
+- [key point 2 from the Handoff Notes]
 
-📊 **Plan cross-progetto attivi** (da STEP 3.5, se presenti):
-- <plan_id>: <N> task in questo sub (<N_done> completed, <N_progress> in_progress, <N_ready> pronti, <N_blocked> bloccati)
-- (se nessun plan: omettere questa riga)
+📊 **Active cross-project plans** (from STEP 3.5, if any):
+- <plan_id>: <N> tasks in this sub (<N_done> completed, <N_progress> in_progress, <N_ready> ready, <N_blocked> blocked)
+- (if no plan: omit this line)
 
-📬 **Inbox handoff** (da `.plan/inbox/`, se presenti):
-- [nome nota]: [1 riga di sintesi + mittente]
-- (se inbox vuota: omettere questa riga)
+📬 **Handoff inbox** (from `.plan/inbox/`, if any):
+- [note name]: [1-line summary + sender]
+- (if inbox empty: omit this line)
 
-🎯 **Prossimo passo suggerito**: [azione specifica basata su TODO, Handoff, Inbox e Plan task pronti]
+🎯 **Suggested next step**: [specific action based on TODO, Handoff, Inbox and ready Plan tasks]
 ```
 
 ---
 
-### 🛑 STEP 5: sprint.txt — se ESISTE parti in AUTOMATICO; se NON esiste, aspetta conferma
+### 🛑 STEP 5: sprint.txt — if it EXISTS start AUTOMATICALLY; if it does NOT exist, wait for confirmation
 
-###STEP 5A: ESISTE SPRINT FILE → AUTO-START (NON si chiede conferma):
+###STEP 5A: SPRINT FILE EXISTS → AUTO-START (no confirmation asked):
 
-Se esiste un file `sprint.txt`, **leggilo per intero**.
+If a `sprint.txt` file exists, **read it in full**.
 
-Se contiene item, **parti SUBITO con l'esecuzione, SENZA chiedere conferma**: organizza il piano di esecuzione e lavora come se gli item fossero una richiesta inserita dall'utente via console (crea/aggiorna i file che devi aggiornare, applica la metodologia, procedi). L'auto-start è il comportamento **voluto**: la presenza di `sprint.txt` È già l'autorizzazione a partire.
+If it contains items, **start executing RIGHT AWAY, WITHOUT asking for confirmation**: organize the execution plan and work as if the items were a request entered by the user via the console (create/update the files you need to update, apply the methodology, proceed). The auto-start is the **intended** behavior: the presence of `sprint.txt` IS already the authorization to start.
 
-⚠️ **NON** applicare qui il checkpoint di STEP 5B: con `sprint.txt` presente NON si aspetta conferma. (Se un singolo item richiede `/add-task` perché i requisiti non sono chiari, applica quella cerimonia per QUEL item — ma non fermare l'intero sprint.)
+⚠️ Do **NOT** apply the STEP 5B checkpoint here: with `sprint.txt` present you do NOT wait for confirmation. (If a single item requires `/add-task` because the requirements aren't clear, apply that ceremony for THAT item — but don't stop the whole sprint.)
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-Procedo con lo sprint
+Proceeding with the sprint
 ```
-Poi **procedi immediatamente** con il primo item (nessuna attesa di conferma).
+Then **proceed immediately** with the first item (no waiting for confirmation).
 
 
-Se non esiste il file sprint.txt allora:
+If the sprint.txt file does not exist, then:
 
-###STEP 5B: NON ESISTE SPRINT FILE:
-**OUTPUT OBBLIGATORIO:**
+###STEP 5B: NO SPRINT FILE:
+**MANDATORY OUTPUT:**
 ```
-Procedo con [azione suggerita] o preferisci altro?
+Shall I proceed with [suggested action] or do you prefer something else?
 ```
 
-**NON procedere finché l'utente non conferma.**
+**Do NOT proceed until the user confirms.**
 
 ---
 
-## Differenza da /resumesession
+## Difference from /resumesession
 
-| Comando | Scopo | Quando usarlo |
-|---------|-------|---------------|
-| `/startsession` | Carica sempre la sessione piu' recente per nome + auto-discovery se PROJECT vuoto | SEMPRE all'inizio |
-| `/resumesession [file]` | Carica sessione specifica | Quando vuoi riprendere una sessione passata |
+| Command | Purpose | When to use it |
+|---------|---------|----------------|
+| `/startsession` | Always loads the most recent session by name + auto-discovery if PROJECT is empty | ALWAYS at the start |
+| `/resumesession [file]` | Loads a specific session | When you want to resume a past session |
 
 ---
 
-## Checklist di verifica per l'utente
+## Verification checklist for the user
 
-Dopo che Claude esegue `/startsession`, verifica:
+After Claude runs `/startsession`, check:
 
-- [ ] Ha eseguito STEP 0 (preflight `jq`) e STEP 0.4 (risolto `$GLOBAL_DIR` via `lock.sh global-dir` + auto-bootstrap idempotente; degrado a solo-locale se non creabile, **senza bloccare**)?
-- [ ] Ha eseguito STEP 0.5 (sentinel) e mostrato lo stato dei marker `.locks/`?
-- [ ] Ha annunciato il PROPRIO UID (o ha dichiarato READ-ONLY MODE se non l'ha creato)?
-- [ ] Ha mostrato la checklist della struttura (incluso PROJECT_UPDATES.md e BEHAVIORS_LOCAL.md)?
-- [ ] Ha eseguito STEP 1.7 (gate `lock.sh progress-check`) e, se `MIGRATE_REQUIRED`, migrato PROGRESS.md nei file split (re-check `MIGRATED`) PRIMA di proseguire?
-- [ ] Ha eseguito STEP 1.8 (`method-check`/`focus-check`/`inbox-check`), letto `FOCUS.md` per primo e fatto emergere le voci `INBOX.md` non triagiate — segnalando anche `focus_bloat=yes` (FOCUS oltre soglia → pota a /savesession) e gli eventuali `inbox_residue` (annotati-sul-posto da SPOSTARE)?
-- [ ] Ha letto PER INTERO TODO.md/TO_FIX.md/TO_TEST.md e tratto la "Prossima priorità" da FOCUS (poi TODO), non dallo Stato rapido?
-- [ ] Ha letto BEHAVIORS.md, BEHAVIORS_LOCAL.md, LEARNED.md, ~/.claude-method/LEARNED_GLOBAL.md e PROJECT_UPDATES.md?
-- [ ] Ha valutato se PROJECT.md è vuoto o popolato?
-- [ ] (Se vuoto) Ha analizzato il repo o fatto domande per nuovo progetto?
-- [ ] (Se vuoto) Si è fermato a chiedere conferma delle deduzioni/risposte?
-- [ ] (Se vuoto) Ha popolato PROJECT.md e PROGRESS.md dopo conferma?
-- [ ] Ha mostrato quante righe ha letto per ogni file?
-- [ ] Ha mostrato un riepilogo con regole comportamentali, regole locali, apprendimenti locali e globali?
-- [ ] Si è fermato ad aspettare conferma finale?
+- [ ] Did it run STEP 0 (preflight `jq`) and STEP 0.4 (resolved `$GLOBAL_DIR` via `lock.sh global-dir` + idempotent auto-bootstrap; degrade to local-only if not creatable, **without blocking**)?
+- [ ] Did it run STEP 0.5 (sentinel) and show the state of the `.locks/` markers?
+- [ ] Did it announce its OWN UID (or declare READ-ONLY MODE if it did not create one)?
+- [ ] Did it show the structure checklist (including PROJECT_UPDATES.md and BEHAVIORS_LOCAL.md)?
+- [ ] Did it run STEP 1.7 (gate `lock.sh progress-check`) and, if `MIGRATE_REQUIRED`, migrate PROGRESS.md into the split files (re-check `MIGRATED`) BEFORE proceeding?
+- [ ] Did it run STEP 1.8 (`method-check`/`focus-check`/`inbox-check`), read `FOCUS.md` first and surface the untriaged `INBOX.md` items — also flagging `focus_bloat=yes` (FOCUS over threshold → prune at /savesession) and any `inbox_residue` (in-place annotations to MOVE)?
+- [ ] Did it read TODO.md/TO_FIX.md/TO_TEST.md IN FULL and take the "Next priority" from FOCUS (then TODO), not from the Quick status?
+- [ ] Did it read BEHAVIORS.md, BEHAVIORS_LOCAL.md, LEARNED.md, ~/.claude-method/LEARNED_GLOBAL.md and PROJECT_UPDATES.md?
+- [ ] Did it assess whether PROJECT.md is empty or populated?
+- [ ] (If empty) Did it analyze the repo or ask questions for a new project?
+- [ ] (If empty) Did it stop to ask for confirmation of the deductions/answers?
+- [ ] (If empty) Did it populate PROJECT.md and PROGRESS.md after confirmation?
+- [ ] Did it show how many lines it read for each file?
+- [ ] Did it show a summary with behavioral rules, local rules, local and global learnings?
+- [ ] Did it stop to wait for the final confirmation?
 
-Se manca qualcosa, Claude non ha seguito il comando correttamente.
+If something is missing, Claude did not follow the command correctly.
