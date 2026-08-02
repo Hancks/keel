@@ -111,6 +111,36 @@ Read `focus_lines` / `focus_bloat` (threshold `focus_bloat_threshold`, default 4
 🌿 Prune FOCUS: focus_lines=[N] · focus_bloat=[no | yes → pruned, re-check: focus_lines=[M], focus_bloat=no] · [K items moved down to the session log | none to move | DEFERRED: FOCUS locked by {uid}]
 ```
 
+#### 2b-ter: 🏃 Review and PRUNE `sprint.txt` (FORCING — if the file exists)
+
+> This exists because `sprint.txt` (which `/startsession` STEP 5A auto-runs) was NOT reviewed at the end of work → it stayed STALE: already-done items still listed, superseded items, state not updated. The next `/startsession` restarts from an old plan (FM1: objective amnesia). It must be **pruned at every close**, like FOCUS.
+
+If `sprint.txt` exists in the project root:
+1. **Re-read it in full.**
+2. For EACH item, compare it with the real state just synced (2b): done/validated → in `DONE.md`/`FIXED.md`? implemented-not-validated → `TO_TEST.md`? still open? superseded/no longer valid?
+3. **Prune**: REMOVE the completed/validated items and the superseded ones; UPDATE the partial ones to the real state (with a note); keep ONLY what truly remains to do.
+4. If after the prune it is empty (all done): leave just the header/comment and flag it — a sprint full of already-done stuff is a plan that **LIES** to the next `/startsession`.
+5. The prune **removes/updates, does not add**: new work goes to `TODO.md`, not to the sprint.
+
+**MANDATORY OUTPUT:**
+```
+🏃 Prune sprint.txt: [N items reviewed · K removed (done/superseded) · J updated · remaining: <1-line summary> | sprint.txt absent → skip]
+```
+
+#### 2b-quater: 📄 ASK YOURSELF whether there are reports/artifacts to update (FORCING)
+
+> Some projects have "showcase" files **derived from state** — e.g. the `/report` output (`design-log/report.html`), a dashboard, other artifacts/reports. They do NOT auto-update at the end of work → they stay stale (the RECURRING gap: files misaligned at reopening). The method must **ask itself ON ITS OWN** at every close, not wait for the user to say so.
+
+**Ask yourself**: did anything change in this session that one or more of these files should reflect?
+1. **Look for** the project's reports/artifacts: `design-log/report.html`, a dashboard, `.html`/artifacts in `design-log/`, files cited as "report/showcase" in FOCUS/PROJECT_UPDATES.
+2. For each, assess whether it is **stale** relative to the state just synced (2b).
+3. If it is stale → **update/regenerate it** (or re-run the command that produces it, e.g. `/report`). Do not leave it stale silently: if you decide NOT to regenerate it (e.g. costly and not needed), **say so explicitly** in the summary with the why.
+
+**MANDATORY OUTPUT:**
+```
+📄 Reports/artifacts: [found: <list> · updated: <which> · left (why): <which> | none]
+```
+
 #### 2c: Verify and update the Design Log (if it exists)
 
 Checklist:
@@ -382,6 +412,8 @@ After Claude runs `/savesession`, check:
 - [ ] Did it do the completeness sweep (every session request landed in a file) and triage `INBOX.md` by **MOVING** the items out (until `inbox_untriaged=0` **and** `inbox_residue=0` — no "✅ done" annotations left inside)?
 - [ ] Did it write to DONE/FIXED ONLY work **validated** by the user (implemented-not-validated → TO_TEST + FOCUS 🧪)?
 - [ ] Did it run the **FOCUS prune** (2b-bis): `focus_bloat=no` on re-check (or prune DEFERRED with a note because FOCUS was locked by another session)?
+- [ ] Did it **review and prune `sprint.txt`** (2b-ter): removed done/superseded items, updated the state — no stale sprint for the next `/startsession`?
+- [ ] Did it **ask itself** (2b-quater) whether there were stale reports/artifacts (e.g. `design-log/report.html`, dashboard), and update/regenerate them (or explicitly say why not)?
 - [ ] Did it update `FOCUS.md` (closed items removed, only ONE 🔄 in progress, history moved down to the session log)?
 - [ ] Did it route the items into the split files (DONE/FIXED/TODO/TO_FIX/TO_TEST) and update PROGRESS.md index + counters?
 - [ ] Did it archive to progress.old.md if DONE.md/FIXED.md exceeded ~400 lines?
