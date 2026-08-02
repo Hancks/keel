@@ -30,6 +30,49 @@ git clone https://github.com/Hancks/keel
 claude --plugin-dir /path/to/keel
 ```
 
+## Quick start
+
+Point Claude Code at keel and open a project:
+```
+cd your-project
+claude --plugin-dir /path/to/keel     # or install via the marketplace (above)
+```
+Then run the loop:
+
+1. **`/keel:startsession`** — at the start of every session. On a new project it scaffolds `design-log/`, reads your state, and shows where you left off. On an empty `PROJECT.md` it interviews you (or reads the repo) to fill it in.
+2. **Work.** Say **"note: <anything>"** (or *segna*, *remember*, *jot* …) and it lands in `INBOX.md` immediately — nothing is lost. For anything non-trivial, run **`/keel:add-task "<what>"`**: it opens a design log, asks the questions it needs, waits for your OK, then implements.
+3. **`/keel:savesession`** — before you stop. It syncs the tracking, prunes `FOCUS` and the sprint, writes a session log, and checks whether any report is stale.
+
+See the whole thing end-to-end in **[TUTORIAL.md](TUTORIAL.md)**.
+
+## Commands
+
+All commands are namespaced `/keel:…` (so they coexist with any other setup). Full detail + examples in **[COMMANDS.md](COMMANDS.md)**.
+
+| Command | What it does |
+|---|---|
+| `/keel:startsession` | Load the project context; scaffold a new project; auto-start `sprint.txt` if present |
+| `/keel:savesession` | Close cleanly: sync tracking, prune FOCUS + sprint, session log, remove the session marker |
+| `/keel:resumesession` | Load a specific past session (not the latest) |
+| `/keel:add-task "<task>"` | Force the methodology for a significant task: design log → Q&A → approval → implement |
+| `/keel:new-issue` | Create a tracked issue (bug / enhancement / review) |
+| `/keel:bug-hunt` | On-demand light bug hunt: a finder per lens (Opus) + adversarial refuters (Fable), report triaged by impact |
+| `/keel:dashboard` | Generate + open a self-contained cross-project dashboard (glance) |
+| `/keel:report` | Write + open a narrated per-project report ("your file" style) |
+| `/keel:sync-dlogs` | Safety net: re-sync the tracking files if they drifted |
+| `/keel:startsharedsession` · `/keel:stopsharedsession` | Coordinate 2+ parallel Claude sessions on the same repo (per-file locks) |
+| `/keel:startcoord` · `/keel:stopcoord` | A cross-project DAG plan visible from each sub's `/startsession` |
+| `/keel:merge-design-log` | Merge a branch's design-log into the target without noisy conflicts / lost entries |
+
+## Core concepts
+
+- **`design-log/`** — the project's memory: plain Markdown, version-controlled. Split by type so no file grows past the reading limit: `FOCUS` (current objective) · `INBOX` (raw capture) · `TODO` / `TO_FIX` (backlog) · `TO_TEST` (implemented, awaiting your eyes) · `DONE` / `FIXED` (validated) · `PROGRESS` (light index) · `LEARNED` (project facts) · `sessions/` · `issues/` · dated design logs.
+- **The work pipeline** — `INBOX → TODO/TO_FIX → FOCUS → TO_TEST → DONE/FIXED`. Every item has one home at a time.
+- **Done = validated, not implemented** — a green build is *implemented*; it reaches `DONE` only after **you** see it work.
+- **GUARDIAN** — the north-star + current objective + cardinal principles, re-injected by hooks so they never fade during a long session.
+- **Two memories** — *local* (facts about this project, in `design-log/LEARNED.md`) and *global* (universal principles of how you work, in `~/.claude-method/LEARNED_GLOBAL/`, shared across projects). Writes to memory always need your confirmation.
+- **Capture verbs (bilingual)** — `note · remember · jot · capture · remind` (and Italian `segna · appunta · annota · ricorda · memorizza · nota`).
+
 ## Cross-project memory (zero-config)
 
 Keel keeps a shared, cross-project memory of the **principles** you accumulate — how *you* work and build — kept separate from each project's own local notes. It lives in `~/.claude-method/` and is **created automatically** the first time keel runs: nothing to set up. Put it elsewhere by setting `KEEL_GLOBAL_DIR`. If the directory can't be created, keel degrades gracefully to per-project memory only. Writes to this memory always require your **explicit confirmation** — keel never records a lesson behind your back.
@@ -48,6 +91,7 @@ If prompts persist, copy the exact command shown in the prompt and allow that (i
 
 ## Structure
 ```
+README.md · COMMANDS.md · TUTORIAL.md  # docs: overview · command reference · end-to-end walkthrough
 .claude-plugin/plugin.json       # plugin manifest
 .claude-plugin/marketplace.json  # marketplace manifest (for /plugin marketplace add)
 hooks/hooks.json                 # SessionStart · UserPromptSubmit · PreToolUse · PostToolUse · PreCompact · Stop
