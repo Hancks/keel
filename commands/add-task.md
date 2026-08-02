@@ -1,159 +1,159 @@
 # Add Task Command
 
-FORZA l'uso della metodologia Design-Log per ogni nuovo task.
+FORCES the use of the Design-Log methodology for every new task.
 
-## Perché questo comando esiste
+## Why this command exists
 
-Claude ha ammesso: "Se non me lo avessi chiesto, non avrei seguito la metodologia."
+Claude admitted: "If you hadn't asked me, I would not have followed the methodology."
 
-Questo comando FORZA il comportamento corretto. Non è opzionale.
+This command FORCES the correct behavior. It is not optional.
 
 ## Usage
 
 ```
-/add-task "descrizione del task"
+/add-task "task description"
 ```
 
-Esempio:
+Example:
 ```
-/add-task "Aggiungere autenticazione JWT"
-```
-
----
-
-## STEP OBBLIGATORI
-
-### STEP 1: Verifica se esiste già
-
-Cerca in `TODO.md` (e `TO_FIX.md` se è un bug) se il task è già presente. Fallback: se il progetto non è migrato (file split vuoti), cerca in `PROGRESS.md`.
-
-**Glance a `INBOX.md`** (BEHAVIORS R.15): la richiesta potrebbe essere già stata catturata lì da un "segna" precedente. Se sì, questo `/add-task` la sta **triagando** — toglila da `INBOX.md` quando la porti in TODO/FOCUS. Coglil'occasione per triagare anche eventuali altre voci INBOX correlate.
-
-**OUTPUT OBBLIGATORIO:**
-```
-🔍 Verifica task esistente:
-✅ Cercato in TODO.md / TO_FIX.md / INBOX.md (fallback PROGRESS.md se non migrato)
-📋 Risultato: [NON TROVATO | TROVATO in [file/sezione] | GIÀ IN INBOX → triago]
-```
-
-Se TROVATO, chiedi:
-```
-Questo task sembra già esistere in [file].
-Vuoi:
-A) Lavorare su quello esistente
-B) Crearne uno nuovo comunque
+/add-task "Add JWT authentication"
 ```
 
 ---
 
-### STEP 2: Valuta complessità
+## MANDATORY STEPS
 
-**OUTPUT OBBLIGATORIO:**
+### STEP 1: Check whether it already exists
+
+Search `TODO.md` (and `TO_FIX.md` if it is a bug) for whether the task is already there. Fallback: if the project is not migrated (empty split files), search `PROGRESS.md`.
+
+**Glance at `INBOX.md`** (BEHAVIORS R.15): the request may already have been captured there by an earlier "note". If so, this `/add-task` is **triaging** it — remove it from `INBOX.md` when you bring it into TODO/FOCUS. Take the chance to triage any other related INBOX items too.
+
+**MANDATORY OUTPUT:**
 ```
-📊 Valutazione complessità:
-- File coinvolti (stima): [numero]
-- Tipo: [semplice | significativo]
-- Richiede design log: [SÌ | NO]
+🔍 Existing-task check:
+✅ Searched TODO.md / TO_FIX.md / INBOX.md (fallback PROGRESS.md if not migrated)
+📋 Result: [NOT FOUND | FOUND in [file/section] | ALREADY IN INBOX → triaging]
 ```
 
-**Criteri:**
-- **Semplice** (NO design log): < 3 file, fix ovvio, nessuna decisione architetturale
-- **Significativo** (SÌ design log): >= 3 file, nuova feature, decisioni da prendere
-
-Se **NO** → salta a STEP 9 (implementa direttamente)
-Se **SÌ** → continua con STEP 3
-
----
-
-### STEP 3: Crea design log
-
-Crea file: `design-log/YYYY-MM-DD-[slug].md`
-
-**OUTPUT OBBLIGATORIO:**
+If FOUND, ask:
 ```
-📝 Design log creato:
-✅ File: design-log/[nome-file].md
+This task seems to already exist in [file].
+Do you want to:
+A) Work on the existing one
+B) Create a new one anyway
 ```
 
 ---
 
-### STEP 4: Scrivi Background e Problem
+### STEP 2: Assess complexity
 
-Compila le sezioni iniziali del design log.
-
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📄 Sezioni compilate:
-✅ Background - [1-2 frasi di riepilogo]
-✅ Problem - [1-2 frasi di riepilogo]
+📊 Complexity assessment:
+- Files involved (estimate): [number]
+- Type: [simple | significant]
+- Requires a design log: [YES | NO]
+```
+
+**Criteria:**
+- **Simple** (NO design log): < 3 files, obvious fix, no architectural decision
+- **Significant** (YES design log): >= 3 files, new feature, decisions to make
+
+If **NO** → skip to STEP 9 (implement directly)
+If **YES** → continue with STEP 3
+
+---
+
+### STEP 3: Create the design log
+
+Create the file: `design-log/YYYY-MM-DD-[slug].md`
+
+**MANDATORY OUTPUT:**
+```
+📝 Design log created:
+✅ File: design-log/[file-name].md
 ```
 
 ---
 
-### STEP 5: Scrivi domande (Metodo Socratico)
+### STEP 4: Write Background and Problem
 
-NON assumere. Fai DOMANDE su tutto ciò che non è chiaro.
+Fill in the initial sections of the design log.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-❓ Domande per te:
+📄 Sections filled in:
+✅ Background - [1-2 sentence summary]
+✅ Problem - [1-2 sentence summary]
+```
 
-Q1: [domanda specifica]
-Q2: [domanda specifica]
-Q3: [domanda specifica]
+---
+
+### STEP 5: Write questions (Socratic Method)
+
+Do NOT assume. ASK questions about anything that is not clear.
+
+**MANDATORY OUTPUT:**
+```
+❓ Questions for you:
+
+Q1: [specific question]
+Q2: [specific question]
+Q3: [specific question]
 ...
 ```
 
-Minimo 2 domande. Se non ci sono domande, spiega perché:
+At least 2 questions. If there are no questions, explain why:
 ```
-❓ Nessuna domanda: [spiegazione del perché tutto è chiaro]
+❓ No questions: [explanation of why everything is clear]
 ```
 
 ---
 
-### 🛑 STEP 6: FERMATI - Aspetta risposte
+### 🛑 STEP 6: STOP - Wait for answers
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
 🛑 CHECKPOINT
 
-Attendo le tue risposte alle domande prima di procedere.
-Non procederò finché non rispondi.
+Waiting for your answers to the questions before proceeding.
+I will not proceed until you answer.
 ```
 
-**NON procedere finché l'utente non risponde.**
+**Do NOT proceed until the user answers.**
 
 ---
 
-### STEP 7: Completa Design
+### STEP 7: Complete the Design
 
-Dopo le risposte, aggiorna il design log:
-- Compila sezione Q&A con risposte
-- Scrivi sezione Design
-- Definisci Implementation Plan
+After the answers, update the design log:
+- Fill in the Q&A section with the answers
+- Write the Design section
+- Define the Implementation Plan
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📐 Design completato:
-✅ Q&A compilato con risposte
-✅ Sezione Design scritta
-✅ Implementation Plan: [N] step definiti
+📐 Design completed:
+✅ Q&A filled in with answers
+✅ Design section written
+✅ Implementation Plan: [N] steps defined
 ```
 
 ---
 
-### 🛑 STEP 8: FERMATI - Chiedi approvazione
+### 🛑 STEP 8: STOP - Ask for approval
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🛑 CHECKPOINT - APPROVAZIONE RICHIESTA
+🛑 CHECKPOINT - APPROVAL REQUIRED
 
-Design completato: design-log/[nome-file].md
+Design completed: design-log/[file-name].md
 
-Riepilogo:
-- [punto chiave 1 del design]
-- [punto chiave 2 del design]
-- [punto chiave 3 del design]
+Summary:
+- [key point 1 of the design]
+- [key point 2 of the design]
+- [key point 3 of the design]
 
 Implementation Plan:
 1. [step 1]
@@ -161,93 +161,93 @@ Implementation Plan:
 3. [step 3]
 ...
 
-Approvi l'implementazione? (sì/no)
+Do you approve the implementation? (yes/no)
 ```
 
-**NON procedere finché l'utente non dice "sì", "approvato", "ok", "procedi" o simile.**
+**Do NOT proceed until the user says "yes", "approved", "ok", "go" or similar.**
 
 ---
 
-### STEP 9: Implementa
+### STEP 9: Implement
 
-Solo DOPO approvazione esplicita (o se task semplice senza design log).
+Only AFTER explicit approval (or if it is a simple task with no design log).
 
-**Prima di scrivere**: porta questo task in `FOCUS.md` come `🔄 in corso` (BEHAVIORS R.17 — una sola voce in corso per volta; se ce n'è già una, mettila `⏸️` o concludila prima). Annota il **criterio di "fatto"** (come l'utente vedrà che funziona).
+**Before writing**: bring this task into `FOCUS.md` as `🔄 in progress` (BEHAVIORS R.17 — only one item in progress at a time; if there is already one, mark it `⏸️` or finish it first). Note the **"done" criterion** (how the user will see that it works).
 
-**OUTPUT OBBLIGATORIO (durante implementazione):**
+**MANDATORY OUTPUT (during implementation):**
 ```
-🎯 Portato in FOCUS.md: 🔄 [task] — criterio di fatto: [...]
-🔨 Implementazione in corso:
-✅ [file creato/modificato] - [cosa]
-✅ [file creato/modificato] - [cosa]
+🎯 Brought into FOCUS.md: 🔄 [task] — done criterion: [...]
+🔨 Implementation in progress:
+✅ [file created/modified] - [what]
+✅ [file created/modified] - [what]
 ...
 ```
 
 ---
 
-### STEP 10: Aggiorna i file di tracking (split per-tipo) — done = validato (R.16)
+### STEP 10: Update the tracking files (split by type) — done = validated (R.16)
 
-⚠️ **Distingui implementato da validato (BEHAVIORS R.16).** `tsc`/build verde NON è "fatto".
+⚠️ **Tell implemented apart from validated (BEHAVIORS R.16).** A green `tsc`/build is NOT "done".
 
-- **Implementato ma NON validato** (tu hai finito di scrivere, l'utente non l'ha ancora visto funzionare) → la voce va in `TO_TEST.md` e resta in `FOCUS.md` con stato `🧪 da validare`. **NON** in `DONE.md`. Il task NON è chiuso.
-- **Validato in questa stessa sessione** (l'utente l'ha visto funzionare) → SOLO ora:
-  - Entry ricca (What/How/Files/Notes) in `DONE.md` (o `FIXED.md` se era un bug)
-  - Rimuovi il task da `TODO.md`/`TO_FIX.md`/`TO_TEST.md` e da `FOCUS.md`
-  - Se `DONE.md`/`FIXED.md` supera ~400 righe → archivia le entry vecchie in `progress.old.md`
-- Aggiorna i contatori + "Last updated" in `PROGRESS.md` (indice)
-- Fallback: se il progetto non è migrato, aggiorna la sezione DONE di `PROGRESS.md`
+- **Implemented but NOT validated** (you finished writing it, the user has not yet seen it work) → the item goes to `TO_TEST.md` and stays in `FOCUS.md` with the state `🧪 to validate`. **NOT** in `DONE.md`. The task is NOT closed.
+- **Validated in this same session** (the user has seen it work) → ONLY now:
+  - A rich entry (What/How/Files/Notes) in `DONE.md` (or `FIXED.md` if it was a bug)
+  - Remove the task from `TODO.md`/`TO_FIX.md`/`TO_TEST.md` and from `FOCUS.md`
+  - If `DONE.md`/`FIXED.md` exceeds ~400 lines → archive the old entries in `progress.old.md`
+- Update the counters + "Last updated" in `PROGRESS.md` (index)
+- Fallback: if the project is not migrated, update the DONE section of `PROGRESS.md`
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📊 Tracking aggiornato:
-[se validato] ✅ Entry in DONE.md (o FIXED.md) · rimosso da TODO/TO_FIX/TO_TEST + FOCUS
-[se solo implementato] 🧪 In TO_TEST.md + FOCUS.md (🧪 da validare) — NON chiuso, attende validazione utente
-✅ PROGRESS.md indice + contatori aggiornati · Timestamp: [nuovo timestamp]
+📊 Tracking updated:
+[if validated] ✅ Entry in DONE.md (or FIXED.md) · removed from TODO/TO_FIX/TO_TEST + FOCUS
+[if only implemented] 🧪 In TO_TEST.md + FOCUS.md (🧪 to validate) — NOT closed, awaiting user validation
+✅ PROGRESS.md index + counters updated · Timestamp: [new timestamp]
 ```
 
 ---
 
-### STEP 11: Aggiorna design log (se esiste)
+### STEP 11: Update the design log (if it exists)
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📝 Design log aggiornato:
-✅ Implementation Plan: tutti gli step spuntati
+📝 Design log updated:
+✅ Implementation Plan: all steps checked off
 ✅ Status: Implemented
-✅ Implementation Results: note aggiunte
+✅ Implementation Results: notes added
 ```
 
 ---
 
-## Riepilogo finale
+## Final summary
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-✅ TASK COMPLETATO
+✅ TASK COMPLETED
 
-📋 Task: [descrizione]
-📝 Design log: [path o "non richiesto"]
-📁 File modificati: [numero]
-📊 Tracking: DONE.md/FIXED.md + TODO.md/TO_FIX.md + PROGRESS.md indice aggiornati
+📋 Task: [description]
+📝 Design log: [path or "not required"]
+📁 Files modified: [number]
+📊 Tracking: DONE.md/FIXED.md + TODO.md/TO_FIX.md + PROGRESS.md index updated
 
-Prossimo passo suggerito: [da TODO.md — o PROGRESS.md TODO se non migrato]
+Suggested next step: [from TODO.md — or PROGRESS.md TODO if not migrated]
 ```
 
 ---
 
-## Checklist di verifica per l'utente
+## Verification checklist for the user
 
-Dopo che Claude esegue `/add-task`, verifica:
+After Claude runs `/add-task`, check:
 
-- [ ] Ha verificato se il task esisteva già?
-- [ ] Ha valutato la complessità?
-- [ ] (Se significativo) Ha creato un design log?
-- [ ] (Se significativo) Ha fatto domande?
-- [ ] (Se significativo) Si è fermato ad aspettare risposte?
-- [ ] (Se significativo) Ha chiesto approvazione esplicita?
-- [ ] Ha portato il task in `FOCUS.md` (🔄 in corso) prima di implementare?
-- [ ] Ha rispettato done=validato (R.16): in DONE/FIXED solo se l'utente ha validato; altrimenti TO_TEST + FOCUS 🧪?
-- [ ] Ha aggiornato i file di tracking alla fine (DONE.md/FIXED.md + TODO.md/TO_FIX.md + PROGRESS.md indice)?
-- [ ] Ha aggiornato il design log alla fine (se esiste)?
+- [ ] Did it check whether the task already existed?
+- [ ] Did it assess the complexity?
+- [ ] (If significant) Did it create a design log?
+- [ ] (If significant) Did it ask questions?
+- [ ] (If significant) Did it stop to wait for answers?
+- [ ] (If significant) Did it ask for explicit approval?
+- [ ] Did it bring the task into `FOCUS.md` (🔄 in progress) before implementing?
+- [ ] Did it respect done=validated (R.16): in DONE/FIXED only if the user validated; otherwise TO_TEST + FOCUS 🧪?
+- [ ] Did it update the tracking files at the end (DONE.md/FIXED.md + TODO.md/TO_FIX.md + PROGRESS.md index)?
+- [ ] Did it update the design log at the end (if it exists)?
 
-Se manca qualcosa, Claude non ha seguito il comando correttamente.
+If something is missing, Claude did not follow the command correctly.
