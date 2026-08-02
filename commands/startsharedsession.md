@@ -1,28 +1,28 @@
 # Start Shared Session Command
 
-Dichiara i file che questa sessione intende modificare e crea lock per evitare conflitti con sessioni parallele. Cambia il proprio marker di sessione da `exclusive` a `shared`.
+Declares the files this session intends to modify and creates locks to avoid conflicts with parallel sessions. Changes your session marker from `exclusive` to `shared`.
 
-## Quando usarlo
+## When to use
 
-- Quando ci sono **2+ sessioni Claude in parallelo** sullo stesso repo
-- **PRIMA** di modificare qualsiasi file
-- Dopo `/startsession`, prima di scrivere codice
+- When there are **2+ parallel Claude sessions** on the same repo
+- **BEFORE** modifying any file
+- After `/startsession`, before writing code
 
-**Pre-requisito:** `/startsession` ha già creato un marker `.locks/session-{uid}.json` di tipo `exclusive`. Recupera l'UID dal contesto della conversazione.
+**Prerequisite:** `/startsession` has already created an `exclusive` marker `.locks/session-{uid}.json`. Recover the UID from the conversation context.
 
-Tutte le operazioni passano da `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh`, auto-approvato. Niente prompt di permission ad ogni step.
+All operations go through `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh`, auto-approved. No permission prompt at every step.
 
 ---
 
-## STEP OBBLIGATORI
+## MANDATORY STEPS
 
-### STEP 1: Identifica i file da toccare
+### STEP 1: Identify the files to touch
 
-Analizza il task assegnato e identifica TUTTI i file che potresti modificare.
+Analyze the assigned task and identify ALL the files you might modify.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📋 File che intendo modificare:
+📋 Files I intend to modify:
 1. [path/to/file1.tsx]
 2. [path/to/file2.ts]
 ...
@@ -30,42 +30,42 @@ Analizza il task assegnato e identifica TUTTI i file che potresti modificare.
 
 ---
 
-### STEP 2: Verifica lock esistenti
+### STEP 2: Check existing locks
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh status
 ```
 
-Estrai dall'output JSON la lista `file_locks[]` e confronta con i file da toccare. Se trovi un lock con `owner_uid` diverso dal tuo su un file che ti serve:
+From the JSON output, extract the `file_locks[]` list and compare it with the files to touch. If you find a lock with an `owner_uid` different from yours on a file you need:
 
 ```
-🔒 CONFLITTO: [file] è lockato da owner_uid [altro-uid]
-⛔ NON posso modificare questo file finché il lock non viene rimosso.
+🔒 CONFLICT: [file] is locked by owner_uid [other-uid]
+⛔ I cannot modify this file until the lock is removed.
 ```
 
-**FERMATI e segnala all'utente.** NON procedere.
+**STOP and flag it to the user.** Do NOT proceed.
 
-Se nessun conflitto:
+If no conflict:
 ```
-✅ Nessun conflitto — tutti i file sono liberi
+✅ No conflict — all files are free
 ```
 
 ---
 
-### STEP 3: Crea i lock per-file e flippa il marker a `shared`
+### STEP 3: Create the per-file locks and flip the marker to `shared`
 
-Una sola invocazione atomica:
+A single atomic call:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh share --uid <uid> <file1> <file2> ...
 ```
 
-Lo script:
-- Verifica nuovamente conflitti (se un altro UID ha lockato uno dei file → exit 3 con errore)
-- Crea `.locks/<path-encoded>.lock` per ogni file (naming: `path/to/file.ext` → `path__to__file.ext.lock`, estensione preservata)
-- Aggiorna `.locks/session-<uid>.json`: `type: exclusive→shared`, `lockedFiles = [file1, file2, ...]`
+The script:
+- Re-checks conflicts (if another UID has locked one of the files → exit 3 with an error)
+- Creates `.locks/<path-encoded>.lock` for each file (naming: `path/to/file.ext` → `path__to__file.ext.lock`, extension preserved)
+- Updates `.locks/session-<uid>.json`: `type: exclusive→shared`, `lockedFiles = [file1, file2, ...]`
 
-Schema dei lock per-file creati:
+Schema of the per-file locks created:
 ```json
 {
   "owner_uid": "<uid>",
@@ -75,9 +75,9 @@ Schema dei lock per-file creati:
 }
 ```
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔒 Lock creati e marker aggiornato:
+🔒 Locks created and marker updated:
 ✅ OK: shared with [N] file(s)
    • [file1] → .locks/[lockfile1]
    • [file2] → .locks/[lockfile2]
@@ -87,55 +87,55 @@ Schema dei lock per-file creati:
 
 ---
 
-### STEP 4: Mostra riepilogo
+### STEP 4: Show the summary
 
 ```
-🔐 SESSIONE CONDIVISA ATTIVA — UID {uid}
+🔐 SHARED SESSION ACTIVE — UID {uid}
 
-📋 File lockati da me:
+📋 Files locked by me:
 - [file1]
 - [file2]
 
-⚠️ Regole:
-- NON modificare file lockati da altre sessioni (controlla `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh status`)
-- Prima di toccare un file non previsto, verifica e crea il lock con `add-file`
-- A fine lavoro condiviso, eseguire /stopsharedsession PRIMA di /savesession
+⚠️ Rules:
+- Do NOT modify files locked by other sessions (check `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh status`)
+- Before touching an unplanned file, check and create the lock with `add-file`
+- At the end of shared work, run /stopsharedsession BEFORE /savesession
 
-Procedo con l'implementazione?
+Shall I proceed with the implementation?
 ```
 
 ---
 
-### 🛑 STEP 5: FERMATI - Aspetta conferma
+### 🛑 STEP 5: STOP - Wait for confirmation
 
-**NON procedere finché l'utente non conferma.**
+**Do NOT proceed until the user confirms.**
 
 ---
 
-## Aggiungere file durante la sessione
+## Adding files during the session
 
-Se durante il lavoro scopri di dover toccare un file non previsto:
+If while working you discover you need to touch an unplanned file:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh add-file --uid <uid> <file>
 ```
 
-Lo script:
-- Verifica conflitti (file già lockato da altro UID → exit 3)
-- Se libero: crea `.locks/<path-encoded>.lock` E appende a `lockedFiles` del marker
-- Se già lockato da te stesso: no-op idempotente, ritorna OK
+The script:
+- Checks conflicts (file already locked by another UID → exit 3)
+- If free: creates `.locks/<path-encoded>.lock` AND appends to the marker's `lockedFiles`
+- If already locked by yourself: idempotent no-op, returns OK
 
 **OUTPUT:**
 ```
-🔒 Lock aggiuntivo: [file]
+🔒 Additional lock: [file]
    ✅ OK: added [file]
 🔄 Marker: lockedFiles += [file]
 ```
 
 ---
 
-## Note
+## Notes
 
-- I file `.locks/` sono in `.gitignore` — non vengono committati
-- Ogni sessione è responsabile dei PROPRI lock (identificati per `owner_uid`)
-- Se una sessione crasha senza /stopsharedsession, i lock restano — l'utente li rimuove manualmente con `rm .locks/*.lock` (NON i `session-*.json` di altri se non sono orfani)
+- The `.locks/` files are in `.gitignore` — they are not committed
+- Each session is responsible for its OWN locks (identified by `owner_uid`)
+- If a session crashes without /stopsharedsession, the locks remain — the user removes them manually with `rm .locks/*.lock` (NOT other sessions' `session-*.json` unless they are orphaned)

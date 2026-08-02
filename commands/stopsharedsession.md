@@ -1,83 +1,83 @@
 # Stop Shared Session Command
 
-Rilascia tutti i lock per-file creati da questa sessione e riporta il proprio marker da `shared` a `exclusive`.
+Releases all per-file locks created by this session and returns your marker from `shared` to `exclusive`.
 
-## Quando usarlo
+## When to use
 
-- **A fine lavoro condiviso** quando si è usato `/startsharedsession`
-- **PRIMA** di `/savesession`
-- Quando il task parallelo è completato
+- **At the end of shared work** when `/startsharedsession` was used
+- **BEFORE** `/savesession`
+- When the parallel task is complete
 
-Tutte le operazioni passano da `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh`, auto-approvato.
+All operations go through `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh`, auto-approved.
 
 ---
 
-## STEP OBBLIGATORI
+## MANDATORY STEPS
 
-### STEP 1: Elenca lock per-file attivi
+### STEP 1: List active per-file locks
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh status
 ```
 
-Estrai dall'output JSON la lista `file_locks[]`. Il marker della sessione corrente (`type: shared`) ha già `lockedFiles` valorizzati — coincidono con i `.lock` per-file con `owner_uid` uguale al tuo UID.
+From the JSON output, extract the `file_locks[]` list. The current session marker (`type: shared`) already has `lockedFiles` populated — they match the per-file `.lock`s whose `owner_uid` equals your UID.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔒 Lock per-file attualmente attivi:
+🔒 Per-file locks currently active:
 - [file1] → owner_uid: [uid]
 - [file2] → owner_uid: [uid]
 ```
 
 ---
 
-### STEP 2: Identifica i MIEI lock vs lock altrui
+### STEP 2: Tell MY locks apart from others'
 
-Recupera il PROPRIO `uid` dal contesto (annunciato da `/startsession`).
+Recover your own `uid` from the context (announced by `/startsession`).
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔓 Lock da rilasciare (miei, owner_uid={uid}):
+🔓 Locks to release (mine, owner_uid={uid}):
 - [file1]
 - [file2]
 
-🔒 Lock di altre sessioni (NON toccare):
-- [file3] (owner_uid: [altro-uid])
+🔒 Locks of other sessions (do NOT touch):
+- [file3] (owner_uid: [other-uid])
 ```
 
 ---
 
-### STEP 3: Rilascia i miei lock e ripristina il marker → `exclusive`
+### STEP 3: Release my locks and restore the marker → `exclusive`
 
-Una sola invocazione atomica:
+A single atomic call:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh release --uid <uid>
 ```
 
-Lo script:
-- Itera su tutti i `.lock` per-file in `.locks/`
-- Rimuove SOLO quelli con `owner_uid` uguale al tuo UID
-- Aggiorna `.locks/session-<uid>.json`: `type: shared→exclusive`, `lockedFiles = []`
+The script:
+- Iterates over all per-file `.lock`s in `.locks/`
+- Removes ONLY those whose `owner_uid` equals your UID
+- Updates `.locks/session-<uid>.json`: `type: shared→exclusive`, `lockedFiles = []`
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔓 Lock rilasciati e marker ripristinato:
+🔓 Locks released and marker restored:
 ✅ OK: released [N] lock(s)
 🔄 Marker: type shared→exclusive, lockedFiles=[]
 ```
 
 ---
 
-### STEP 4: Conferma pulizia
+### STEP 4: Confirm cleanup
 
 ```
-✅ SESSIONE CONDIVISA CHIUSA — UID {uid}
+✅ SHARED SESSION CLOSED — UID {uid}
 
-🔓 [N] lock per-file rilasciati
-🔒 [M] lock per-file di altre sessioni ancora attivi
-🔄 Marker tornato a EXCLUSIVE
-📂 Directory .locks/: contiene il mio session-{uid}.json + [M] lock altrui
+🔓 [N] per-file locks released
+🔒 [M] per-file locks of other sessions still active
+🔄 Marker back to EXCLUSIVE
+📂 Directory .locks/: contains my session-{uid}.json + [M] others' locks
 
-Adesso puoi eseguire /savesession (rimuoverà il marker).
+You can now run /savesession (it will remove the marker).
 ```

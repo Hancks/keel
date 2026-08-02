@@ -1,21 +1,21 @@
 # Resume Session Command
 
-Carica una sessione SPECIFICA (diversa dalla più recente).
+Loads a SPECIFIC session (other than the most recent one).
 
-## Differenza da /startsession
+## Difference from /startsession
 
-| Comando | Cosa carica | Quando usarlo |
-|---------|-------------|---------------|
-| `/startsession` | Sempre la sessione piu' recente per nome | SEMPRE all'inizio |
-| `/resumesession [file]` | Sessione specifica | Per riprendere sessione passata |
+| Command | What it loads | When to use it |
+|---------|---------------|----------------|
+| `/startsession` | Always the most recent session by name | ALWAYS at the start |
+| `/resumesession [file]` | A specific session | To resume a past session |
 
 ## Usage
 
 ```
-/resumesession [nome-file-sessione]
+/resumesession [session-file-name]
 ```
 
-Esempi:
+Examples:
 ```
 /resumesession 2026-01-20-23-15
 /resumesession 2026-01-21-00-38.md
@@ -23,106 +23,106 @@ Esempi:
 
 ---
 
-## STEP OBBLIGATORI
+## MANDATORY STEPS
 
-### STEP 1: Lista sessioni disponibili
+### STEP 1: List available sessions
 
-Se l'utente non specifica un file, mostra le sessioni disponibili.
+If the user does not specify a file, show the available sessions.
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📁 Sessioni disponibili:
+📁 Available sessions:
 
-| File | Data | Summary |
+| File | Date | Summary |
 |------|------|---------|
-| 2026-01-21-00-38.md | 2026-01-21 | [prima riga del summary] |
-| 2026-01-20-23-50.md | 2026-01-20 | [prima riga del summary] |
+| 2026-01-21-00-38.md | 2026-01-21 | [first line of the summary] |
+| 2026-01-20-23-50.md | 2026-01-20 | [first line of the summary] |
 | ... | ... | ... |
 
-Quale sessione vuoi caricare?
+Which session do you want to load?
 ```
 
 ---
 
-### STEP 2: Verifica file esiste
+### STEP 2: Verify the file exists
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔍 Verifica sessione:
-✅ File trovato: design-log/sessions/[nome].md
-```
-
-Se non trovato:
-```
-❌ File non trovato: design-log/sessions/[nome].md
-
-Sessioni disponibili:
-[lista]
+🔍 Session check:
+✅ File found: design-log/sessions/[name].md
 ```
 
----
-
-### STEP 3: Leggi sessione specificata
-
-Leggi il file della sessione richiesta.
-
-**OUTPUT OBBLIGATORIO:**
+If not found:
 ```
-📖 Sessione caricata:
-✅ design-log/sessions/[nome].md ([N] righe)
+❌ File not found: design-log/sessions/[name].md
+
+Available sessions:
+[list]
 ```
 
 ---
 
-### STEP 4: Mostra contesto della sessione
+### STEP 3: Read the specified session
 
-**OUTPUT OBBLIGATORIO:**
+Read the requested session file.
+
+**MANDATORY OUTPUT:**
 ```
-📅 **Sessione**: [nome file]
+📖 Session loaded:
+✅ design-log/sessions/[name].md ([N] lines)
+```
+
+---
+
+### STEP 4: Show the session context
+
+**MANDATORY OUTPUT:**
+```
+📅 **Session**: [file name]
 
 📝 **Summary**:
-[contenuto Session Summary]
+[Session Summary content]
 
-📊 **Stato al momento della sessione**:
-- Working on: [da Currently Working On]
-- Procedure state: [da Procedure State]
+📊 **State at the time of the session**:
+- Working on: [from Currently Working On]
+- Procedure state: [from Procedure State]
 
-🎯 **Handoff Notes di quella sessione**:
-- [punto 1 da Immediate Next Steps]
-- [punto 2]
+🎯 **Handoff Notes of that session**:
+- [point 1 from Immediate Next Steps]
+- [point 2]
 
-⚠️ **Nota**: Questa è una sessione passata, non latest.
-Per verificare lo stato attuale, usa /startsession.
+⚠️ **Note**: This is a past session, not the latest.
+To check the current state, use /startsession.
 ```
 
 ---
 
-### 🛑 STEP 5: FERMATI - Aspetta istruzioni
+### 🛑 STEP 5: STOP - Wait for instructions
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-Sessione [nome] caricata.
+Session [name] loaded.
 
-Vuoi:
-A) Continuare da dove questa sessione si era interrotta
-B) Solo consultare questa sessione e tornare alla piu' recente
-C) Altro
+Do you want to:
+A) Continue from where this session left off
+B) Just consult this session and return to the most recent one
+C) Other
 
-Cosa preferisci?
+What do you prefer?
 ```
 
-**NON procedere finché l'utente non risponde.**
+**Do NOT proceed until the user answers.**
 
 ---
 
-## Checklist di verifica per l'utente
+## Verification checklist for the user
 
-Dopo che Claude esegue `/resumesession`, verifica:
+After Claude runs `/resumesession`, check:
 
-- [ ] Ha mostrato le sessioni disponibili (se non specificato)?
-- [ ] Ha verificato che il file esiste?
-- [ ] Ha mostrato il contenuto della sessione?
-- [ ] Ha avvisato che è una sessione passata?
-- [ ] Si è fermato ad aspettare istruzioni?
+- [ ] Did it show the available sessions (if not specified)?
+- [ ] Did it verify the file exists?
+- [ ] Did it show the session content?
+- [ ] Did it warn that it is a past session?
+- [ ] Did it stop to wait for instructions?
 
-Se manca qualcosa, Claude non ha seguito il comando correttamente.
+If something is missing, Claude did not follow the command correctly.
