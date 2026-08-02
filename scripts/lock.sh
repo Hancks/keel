@@ -1,36 +1,35 @@
 #!/usr/bin/env bash
-# design-log-method — GUARDIAN + lossless hook logic (Fase 1)
-# Bundled plugin script. Robusto per costruzione: gli hook non devono MAI far
-# crashare la sessione → niente `set -e`; ogni lettura opzionale è guardata;
-# i punti d'ingresso hook escono 0.
+# keel — GUARDIAN + lossless hook logic (Phase 1)
+# Bundled plugin script. Robust by construction: hooks must NEVER crash the
+# session → no `set -e`; every optional read is guarded; hook entry points exit 0.
 #
 # Subcommands:
-#   guardian-block          Assembla Tier1(core)+Tier2(tipo)+Tier3(NORTH_STAR)+obiettivo FOCUS -> stdout.
-#   hook-sessionstart       SessionStart: stampa guardian-block su stdout (iniettato nel contesto).
-#   hook-userpromptsubmit   UserPromptSubmit: cattura "segna" -> INBOX; re-inietta il guardian su /add-task.
-#   hook-pretooluse         PreToolUse (Edit|Write): guardie hard-block (R.1 · R.17 · FM9 LEARNED).
-#   learned-approve         FM9: scrive il marker di conferma che SBLOCCA la scrittura sui LEARNED.
-#   learned-approve-clear   FM9: azzera il marker di conferma.
-#   detect-type             Stampa software|non-software (da PROJECT.md). [helper di test]
-#   north-star              Stampa il blocco NORTH_STAR estratto da PROJECT.md. [helper di test]
+#   guardian-block          Assemble Tier1(core)+Tier2(type)+Tier3(NORTH_STAR)+FOCUS objective -> stdout.
+#   hook-sessionstart       SessionStart: print guardian-block to stdout (injected into the context).
+#   hook-userpromptsubmit   UserPromptSubmit: capture a "note" verb -> INBOX; re-inject the guardian on /add-task.
+#   hook-pretooluse         PreToolUse (Edit|Write): hard-block guards (R.1 · R.17 · FM9 LEARNED).
+#   learned-approve         FM9: writes the confirmation marker that UNLOCKS writes to the LEARNED files.
+#   learned-approve-clear   FM9: clears the confirmation marker.
+#   detect-type             Print software|non-software (from PROJECT.md). [test helper]
+#   north-star              Print the NORTH_STAR block extracted from PROJECT.md. [test helper]
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 DL="$PROJECT_DIR/design-log"
 HOOKLOG="$PROJECT_DIR/.claude-designlog-hooks.log"
-# Memoria globale cross-progetto: dir risolta da env KEEL_GLOBAL_DIR (default ~/.claude-method).
-# Portabilità (Fase 4): chi non ha questa dir NON deve rompersi — le feature che la usano la
-# bootstrappano (subcommand global-bootstrap, chiamato silenziosamente a SessionStart) o
-# degradano a solo-locale se non è creabile.
+# Cross-project global memory: dir resolved from env KEEL_GLOBAL_DIR (default ~/.claude-method).
+# Portability: whoever lacks this dir must NOT break — the features that use it bootstrap it
+# (subcommand global-bootstrap, called silently at SessionStart) or degrade to local-only if
+# it cannot be created.
 GLOBAL_DIR="${KEEL_GLOBAL_DIR:-$HOME/.claude-method}"
-# Marker di sessione + lock per-file del progetto corrente (usati dai comandi orchestratori).
+# Session marker + per-file locks for the current project (used by the orchestrator commands).
 LOCKS_DIR="$PROJECT_DIR/.locks"
-# FM9: marker di conferma per la scrittura sui LEARNED (nonce + file approvati + scadenza).
+# FM9: confirmation marker for writing to the LEARNED files (nonce + approved files + expiry).
 LEARNED_MARKER="$PROJECT_DIR/.locks/learned-write-approved.json"
 
 if command -v jq >/dev/null 2>&1; then HAS_JQ=1; else HAS_JQ=0; fi
 
-# Log osservabile: ogni hook che scatta lascia una riga (ora UTC) → il test verifica QUI.
+# Observable log: every hook that fires leaves a line (UTC time) → tests check HERE.
 hooklog() { printf '[%s] %s\n' "$(date -u +%FT%TZ 2>/dev/null)" "$1" >> "$HOOKLOG" 2>/dev/null || true; }
 
 project_md() {
@@ -56,7 +55,7 @@ north_star() {
 
 guardian_block() {
   local type; type="$(detect_type)"
-  echo "=== 🧭 GUARDIAN — tieni SEMPRE presente (contesto · obiettivo · principi) ==="
+  echo "=== 🧭 GUARDIAN — always keep in mind (context · objective · principles) ==="
   echo
   if [ -f "$PLUGIN_ROOT/principi/core.md" ]; then cat "$PLUGIN_ROOT/principi/core.md"; echo; fi
   if [ "$type" = "software" ]; then
@@ -65,10 +64,10 @@ guardian_block() {
     if [ -f "$PLUGIN_ROOT/principi/non-software.md" ]; then cat "$PLUGIN_ROOT/principi/non-software.md"; echo; fi
   fi
   local ns; ns="$(north_star)"
-  if [ -n "$ns" ]; then echo "## 🎯 NORTH_STAR — questo progetto"; echo "$ns"; echo; fi
+  if [ -n "$ns" ]; then echo "## 🎯 NORTH_STAR — this project"; echo "$ns"; echo; fi
   if [ -f "$DL/FOCUS.md" ]; then
     local fl; fl="$(grep -m1 -E '^[[:space:]]*- .*🔄' "$DL/FOCUS.md" 2>/dev/null)"
-    if [ -n "$fl" ]; then echo "## 🔄 Obiettivo corrente (FOCUS)"; echo "$fl"; fi
+    if [ -n "$fl" ]; then echo "## 🔄 Current objective (FOCUS)"; echo "$fl"; fi
   fi
 }
 
@@ -95,23 +94,24 @@ emit_additional_context() {
 cmd_hook_userpromptsubmit() {
   local prompt; prompt="$(read_prompt)"
   local ctx="" seg="no"
-  if printf '%s' "$prompt" | grep -qiE '(^|[[:space:]])segna([[:space:]]|:|$)' 2>/dev/null; then
+  # Bilingual capture trigger: the user can say it in Italian or English.
+  if printf '%s' "$prompt" | grep -qiE '(^|[[:space:]])(segna|appunta|annota|ricorda|memorizza|nota|note|remember|jot|capture|remind)([[:space:]]|:|$)' 2>/dev/null; then
     seg="yes"
     mkdir -p "$DL" 2>/dev/null
-    [ -f "$DL/INBOX.md" ] || printf '# 📥 INBOX — Cattura grezza (da triagiare)\n\n## Da triagiare\n\n' > "$DL/INBOX.md"
-    # togli il placeholder *(vuoto)* se presente, altrimenti resta accanto alle catture
-    if grep -qE '^[[:space:]]*\*\(vuoto\)\*[[:space:]]*$' "$DL/INBOX.md" 2>/dev/null; then
-      grep -vE '^[[:space:]]*\*\(vuoto\)\*[[:space:]]*$' "$DL/INBOX.md" > "$DL/INBOX.md.tmp" 2>/dev/null && mv "$DL/INBOX.md.tmp" "$DL/INBOX.md"
+    [ -f "$DL/INBOX.md" ] || printf '# 📥 INBOX — Raw capture (to triage)\n\n## To triage\n\n' > "$DL/INBOX.md"
+    # drop the *(empty)* placeholder if present, otherwise it stays next to the captures
+    if grep -qE '^[[:space:]]*\*\(empty\)\*[[:space:]]*$' "$DL/INBOX.md" 2>/dev/null; then
+      grep -vE '^[[:space:]]*\*\(empty\)\*[[:space:]]*$' "$DL/INBOX.md" > "$DL/INBOX.md.tmp" 2>/dev/null && mv "$DL/INBOX.md.tmp" "$DL/INBOX.md"
     fi
     local today oneline; today="$(date +%Y-%m-%d 2>/dev/null)"; oneline="$(printf '%s' "$prompt" | tr '\n' ' ')"
-    printf -- '- [ ] [%s] (cattura "segna") %s\n' "$today" "$oneline" >> "$DL/INBOX.md"
-    ctx="✅ Cattura-segna: la richiesta è GIÀ stata scritta in design-log/INBOX.md dall'hook (R.15). NON riscriverla tu — è già catturata. Trattala SOLO come voce da triagiare (non da fare adesso)."
+    printf -- '- [ ] [%s] (capture) %s\n' "$today" "$oneline" >> "$DL/INBOX.md"
+    ctx="✅ Capture: the request has ALREADY been written to design-log/INBOX.md by the hook (R.15). Do NOT rewrite it — it is already captured. Treat it ONLY as an item to triage (not to do right now)."
   fi
-  # NB: il refresh del guardian a inizio-task NON è più qui (lo slash-command /add-task
-  # viene espanso → l'hook non vede la stringa). Lo gestisce la skill `guardian` (model-level)
-  # + gli hook SessionStart / SessionStart-compact.
+  # NB: the start-of-task guardian refresh is NOT here anymore (the /add-task slash-command is
+  # expanded → the hook never sees the string). The `guardian` skill handles it (model-level)
+  # plus the SessionStart / SessionStart-compact hooks.
   local preview; preview="$(printf '%s' "$prompt" | tr '\n' ' ' | cut -c1-70 2>/dev/null)"
-  hooklog "UserPromptSubmit (segna=$seg) «${preview}»"
+  hooklog "UserPromptSubmit (capture=$seg) «${preview}»"
   [ -n "$ctx" ] && emit_additional_context "$ctx"
   exit 0
 }
@@ -127,9 +127,9 @@ deny() {
   exit 0
 }
 
-# FM9 — la scrittura su LEARNED è consentita SOLO se esiste un marker di conferma
-# valido (non scaduto) che include il file bersaglio. Fail-safe: in ogni dubbio
-# (marker assente/scaduto/illeggibile, python3 mancante) → NON approvato → deny.
+# FM9 — a write to a LEARNED file is allowed ONLY if a valid (non-expired) confirmation marker
+# exists and includes the target file. Fail-safe: on any doubt (marker missing/expired/unreadable,
+# python3 absent) → NOT approved → deny.
 learned_approved() {
   local target="$1"
   [ -f "$LEARNED_MARKER" ] || return 1
@@ -153,8 +153,8 @@ sys.exit(0 if target in files else 1)
 PY
 }
 
-# Scrive il marker di conferma FM9. Da chiamare SOLO dopo l'OK esplicito dell'utente
-# sulla classificazione proposta dal distillatore. TTL default 30 min.
+# Writes the FM9 confirmation marker. Call ONLY after the user's explicit OK on the
+# classification proposed by the distiller. Default TTL 30 min.
 cmd_learned_approve() {
   local ttl=30; local -a files=()
   while [ $# -gt 0 ]; do
@@ -172,10 +172,10 @@ json.dump({"nonce": uuid.uuid4().hex, "files": files,
           "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
           "expires_at": time.time() + ttl * 60}, open(marker, "w"))
 PY
-  echo "✅ learned-approve: ${#files[@]} file approvati per ${ttl} min → $LEARNED_MARKER"
+  echo "✅ learned-approve: ${#files[@]} file(s) approved for ${ttl} min → $LEARNED_MARKER"
 }
 
-cmd_learned_approve_clear() { rm -f "$LEARNED_MARKER" 2>/dev/null; echo "🧹 learned-approve azzerato"; }
+cmd_learned_approve_clear() { rm -f "$LEARNED_MARKER" 2>/dev/null; echo "🧹 learned-approve cleared"; }
 
 cmd_hook_pretooluse() {
   local input fp
@@ -187,25 +187,25 @@ cmd_hook_pretooluse() {
 try: print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))
 except Exception: pass' 2>/dev/null)"
   fi
-  # Enforce SOLO su progetti serviti dal metodo (esiste design-log/).
+  # Enforce ONLY on projects served by the method (design-log/ exists).
   [ -d "$DL" ] || { hooklog "PreToolUse (no design-log) → ALLOW"; exit 0; }
-  # (i) R.1 — marker di sessione obbligatorio.
+  # (i) R.1 — session marker required.
   if ! ls "$PROJECT_DIR"/.locks/session-*.json >/dev/null 2>&1; then
-    deny "Design-Log (R.1): nessuna sessione attiva in .locks/. Esegui /startsession prima di modificare file."
+    deny "Design-Log (R.1): no active session in .locks/. Run /startsession before editing files."
   fi
-  # (v) FM9 — scrittura sui LEARNED (locale + globale) consentita SOLO con conferma esplicita.
+  # (v) FM9 — writing to the LEARNED files (local + global) allowed ONLY with explicit confirmation.
   case "$fp" in
     */design-log/LEARNED.md|*/LEARNED_GLOBAL/*)
       if ! learned_approved "$fp"; then
-        deny "Design-Log (R.14/FM9): scrittura su LEARNED bloccata senza conferma. Fai proporre la classificazione dal distillatore (agent learned-distiller), falla CONFERMARE all'utente, poi sblocca con: lock.sh learned-approve \"$fp\". In dubbio la memoria NON si scrive."
+        deny "Design-Log (R.14/FM9): write to a LEARNED file blocked without confirmation. Have the distiller (agent learned-distiller) propose the classification, get the user to CONFIRM it, then unlock with: lock.sh learned-approve \"$fp\". When in doubt, memory is NOT written."
       fi
-      hooklog "PreToolUse ${fp##*/} (LEARNED, conferma OK) → ALLOW"
+      hooklog "PreToolUse ${fp##*/} (LEARNED, confirmed OK) → ALLOW"
       exit 0
       ;;
   esac
-  # (vi) Fase 2a — un design-log NON si marca "Approved/Implemented" senza una sezione
-  # "## Antitesi": il rito di confutazione (agent adversarial-critic) non è saltabile in
-  # silenzio. La skill giudica la qualità; questo hook garantisce che il rito ci sia.
+  # (vi) Phase 2a — a design-log is NOT marked "Approved/Implemented" without a
+  # "## Antithesis" section: the refutation ritual (agent adversarial-critic) cannot be
+  # silently skipped. The skill judges quality; this hook guarantees the ritual happened.
   case "$fp" in
     */design-log/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*.md)
       local newtext
@@ -218,19 +218,19 @@ try:
 except Exception: pass' 2>/dev/null)"
       fi
       if printf '%s' "$newtext" | grep -qE 'Status:[^A-Za-z]*(Approved|Implemented)'; then
-        if ! printf '%s' "$newtext" | grep -qE '^#{2,}[[:space:]]*Antitesi' \
-           && ! grep -qE '^#{2,}[[:space:]]*Antitesi' "$fp" 2>/dev/null; then
-          deny "Design-Log (Fase 2a): stai marcando questo design 'Approved/Implemented' ma manca la sezione '## Antitesi'. Fai girare il confutatore (agent adversarial-critic), scrivi antitesi + sintesi nel design log, POI marca lo stato."
+        if ! printf '%s' "$newtext" | grep -qE '^#{2,}[[:space:]]*Antithesis' \
+           && ! grep -qE '^#{2,}[[:space:]]*Antithesis' "$fp" 2>/dev/null; then
+          deny "Design-Log (Phase 2a): you are marking this design 'Approved/Implemented' but the '## Antithesis' section is missing. Run the refuter (agent adversarial-critic), write antithesis + synthesis in the design log, THEN set the status."
         fi
       fi
       ;;
   esac
-  # (iii) R.17 — lavoro FUORI da design-log/ richiede un obiettivo in corso in FOCUS.
+  # (iii) R.17 — work OUTSIDE design-log/ requires a current objective in FOCUS.
   case "$fp" in
-    */design-log/*|"") : ;;   # bookkeeping del metodo o path assente → consentito
+    */design-log/*|"") : ;;   # method bookkeeping or missing path → allowed
     *)
       if [ -f "$DL/FOCUS.md" ] && ! grep -qE '^[[:space:]]*- .*🔄' "$DL/FOCUS.md" 2>/dev/null; then
-        deny "Design-Log (R.17): nessun obiettivo in corso in FOCUS.md. Porta il lavoro in FOCUS (o usa /add-task) prima di implementare."
+        deny "Design-Log (R.17): no current objective in FOCUS.md. Bring the work into FOCUS (or use /add-task) before implementing."
       fi
       ;;
   esac
@@ -242,14 +242,14 @@ cmd_hook_precompact() {
   local input pct; input="$(cat)"; pct=""
   if [ "$HAS_JQ" -eq 1 ]; then pct="$(printf '%s' "$input" | jq -r '.context_fullness.percentage // ""' 2>/dev/null)"; fi
   hooklog "PreCompact (fullness=${pct:-?}%)"
-  # snapshot lossless dell'obiettivo corrente PRIMA che il compattamento tagli
+  # lossless snapshot of the current objective BEFORE compaction cuts it
   if [ -f "$DL/FOCUS.md" ]; then
     { printf '\n[%s] pre-compact (fullness=%s%%)\n' "$(date -u +%FT%TZ 2>/dev/null)" "${pct:-?}"
       grep -m1 -E '^[[:space:]]*- .*🔄' "$DL/FOCUS.md" 2>/dev/null || true
     } >> "$DL/.precompact-snapshot.md" 2>/dev/null || true
   fi
   if [ "$HAS_JQ" -eq 1 ]; then
-    jq -n --arg m "🧭 Compattamento imminente (${pct:-?}%): il GUARDIAN si re-inietterà dopo. Valuta /savesession se hai lavoro non salvato." '{systemMessage:$m}' 2>/dev/null || true
+    jq -n --arg m "🧭 Compaction imminent (${pct:-?}%): the GUARDIAN will re-inject afterward. Consider /savesession if you have unsaved work." '{systemMessage:$m}' 2>/dev/null || true
   fi
   exit 0
 }
@@ -262,13 +262,13 @@ cmd_hook_stop() {
     untriaged="$(grep -cE '^[[:space:]]*- \[ \]' "$DL/INBOX.md" 2>/dev/null || true)"; untriaged=${untriaged:-0}
   fi
   hooklog "Stop (inbox_untriaged=$untriaged)"
-  # auto-refresh del dashboard cross-progetto: rigenera l'HTML a fine turno (sempre fresco).
-  # Nessun arg → usa la config (KEEL_DASHBOARD_ROOTS / dashboard.roots / cwd). Scrive in <GLOBAL_DIR>/dashboard/.
+  # auto-refresh of the cross-project dashboard: regenerate the HTML at end of turn (always fresh).
+  # No args → uses the config (KEEL_DASHBOARD_ROOTS / dashboard.roots / cwd). Writes to <GLOBAL_DIR>/dashboard/.
   python3 "$PLUGIN_ROOT/scripts/dashboard.py" >/dev/null 2>&1 || true
-  # sweep BLOCCANTE (FM2 «non perdere nulla»): non chiudere il turno con catture non triagiate.
-  # Escape anti-loop: il modello può marcarle RINVIATE ('- [ ]' → '- [>]') → non contano più.
+  # BLOCKING sweep (FM2 "lose nothing"): do not end the turn with untriaged captures.
+  # Anti-loop escape: the model may mark them DEFERRED ('- [ ]' → '- [>]') → they no longer count.
   if [ "${untriaged:-0}" -gt 0 ] 2>/dev/null; then
-    local r="📥 Design-Log: ${untriaged} voce/i non triagiata/e in design-log/INBOX.md. PRIMA di terminare: triaga ognuna (spostala → TODO.md/TO_FIX.md o cestina) OPPURE, se serve una decisione dell'utente, marcala RINVIATA cambiando '- [ ]' in '- [>]'. Poi termina."
+    local r="📥 Design-Log: ${untriaged} untriaged item(s) in design-log/INBOX.md. BEFORE ending: triage each one (move it → TODO.md/TO_FIX.md or trash it) OR, if a user decision is needed, mark it DEFERRED by changing '- [ ]' to '- [>]'. Then end."
     if [ "$HAS_JQ" -eq 1 ]; then
       jq -n --arg r "$r" '{decision:"block",reason:$r}' 2>/dev/null || true
     else
@@ -293,12 +293,12 @@ try: print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))
 except Exception: pass' 2>/dev/null)"
   fi
   [ -d "$DL" ] || exit 0
-  # Refresh GUARDIAN alla CREAZIONE di un nuovo design-log DATATO (= task partito).
-  # Solo tool Write (creazione), non Edit → una sola iniezione per nuovo task.
+  # Refresh the GUARDIAN when a new DATED design-log is CREATED (= a task started).
+  # Only the Write tool (creation), not Edit → one injection per new task.
   case "$fp" in
     */design-log/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*.md)
       if [ "$tname" = "Write" ]; then
-        hooklog "PostToolUse (nuovo design-log: ${fp##*/}) → GUARDIAN refresh"
+        hooklog "PostToolUse (new design-log: ${fp##*/}) → GUARDIAN refresh"
         local blk; blk="$(guardian_block)"
         if [ "$HAS_JQ" -eq 1 ]; then
           jq -n --arg c "$blk" '{hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:$c}}' 2>/dev/null || true
@@ -311,51 +311,51 @@ except Exception: pass' 2>/dev/null)"
   exit 0
 }
 
-# --- Memoria globale cross-progetto: risoluzione + bootstrap (Fase 4, portabilità) ---
+# --- Cross-project global memory: resolution + bootstrap (portability) ---
 cmd_global_dir() { printf '%s\n' "$GLOBAL_DIR"; }
 
-# Idempotente: crea lo scheletro della memoria globale se manca. Non sovrascrive file
-# esistenti. Degrado graceful: se la dir non è creabile → avviso su stderr + exit 0
-# (la feature userà solo la memoria LOCALE del progetto, design-log/LEARNED.md).
+# Idempotent: creates the global-memory skeleton if missing. Does not overwrite existing
+# files. Graceful degrade: if the dir cannot be created → warning on stderr + exit 0
+# (the feature will use only the project's LOCAL memory, design-log/LEARNED.md).
 cmd_global_bootstrap() {
   local dir="$GLOBAL_DIR"
   if ! mkdir -p "$dir/LEARNED_GLOBAL" 2>/dev/null; then
-    echo "⚠️ keel: impossibile creare $dir — memoria globale disattivata (resta solo design-log/LEARNED.md)." >&2
+    echo "⚠️ keel: cannot create $dir — global memory disabled (only design-log/LEARNED.md remains)." >&2
     return 0
   fi
   if [ ! -f "$dir/LEARNED_GLOBAL.md" ]; then
     cat > "$dir/LEARNED_GLOBAL.md" <<'EOF'
 # LEARNED_GLOBAL — Index / Manifest
 
-> Memoria condivisa cross-progetto del metodo (keel). Letta a inizio sessione; scritta SOLO
-> tramite il distiller + conferma esplicita (hard-block FM9). Un file per **dominio** in
+> Shared cross-project memory of the method (keel). Read at session start; written ONLY
+> through the distiller + explicit confirmation (hard-block FM9). One file per **domain** in
 > `LEARNED_GLOBAL/`.
 
-## Criterio di routing (PRINCIPIO vs FATTO)
+## Routing criterion (PRINCIPLE vs FACT)
 
-Una voce sta qui SOLO se è un **PRINCIPIO universale** di *come si lavora / come si costruisce*
-(vero sempre, indipendente dal tool). Ogni **FATTO/gotcha specifico** di un tool/API/progetto è
-**LOCALE** (`<progetto>/design-log/LEARNED.md`) — le memorie locali si recuperano cross-progetto.
-Riuso quasi-nullo → cestino. Regola secca: **GLOBAL = principio · LOCAL = fatto specifico.**
+An entry belongs here ONLY if it is a **universal PRINCIPLE** of *how you work / how you build*
+(always true, tool-independent). Every **specific FACT/gotcha** of a tool/API/project is **LOCAL**
+(`<project>/design-log/LEARNED.md`) — local memories are recalled cross-project when needed.
+Near-zero reuse → trash. Blunt rule: **GLOBAL = principle · LOCAL = specific fact.**
 
-## Domini
+## Domains
 
-- `general.md` — SEMPRE: metodo/workflow/debugging/comunicazione (cross-dominio)
-- `preferenze.md` — SEMPRE: preferenze utente trasversali a tutti i progetti
-- `software-general.md` — git/bash/tooling/build/architettura cross-repo/ML/ffmpeg
+- `general.md` — ALWAYS: method/workflow/debugging/communication (cross-domain)
+- `preferences.md` — ALWAYS: user preferences across all projects
+- `software-general.md` — git/bash/tooling/build/cross-repo architecture/ML/ffmpeg
 - `software-apple.md` — Swift/SwiftUI/iOS/macOS/Xcode/AVFoundation
 - `software-web.md` — JS/TS/Next/React/Node/Python-backend/DB/auth/SaaS/cloud
-- `design.md` — UX/visivo/prodotto
+- `design.md` — UX/visual/product
 
-Caricamento condizionale per stack: sempre index + `general` + `preferenze`; i domini
-software/design solo se pertinenti allo stack del progetto.
+Conditional loading by stack: always the index + `general` + `preferences`; the software/design
+domains only if relevant to the project's stack.
 EOF
   fi
   local d
-  for d in general preferenze software-general software-apple software-web design; do
-    [ -f "$dir/LEARNED_GLOBAL/$d.md" ] || printf '# LEARNED_GLOBAL — %s\n\n> Principi universali del dominio «%s». Per ora vuoto: le voci le aggiunge il distiller (proposta + conferma).\n\n### Pattern Tecnici\n\n### Errori da Non Ripetere\n\n### Soluzioni Riutilizzabili\n' "$d" "$d" > "$dir/LEARNED_GLOBAL/$d.md"
+  for d in general preferences software-general software-apple software-web design; do
+    [ -f "$dir/LEARNED_GLOBAL/$d.md" ] || printf '# LEARNED_GLOBAL — %s\n\n> Universal principles for the "%s" domain. Empty for now: entries are added by the distiller (proposal + confirmation).\n\n### Technical Patterns\n\n### Mistakes Not to Repeat\n\n### Reusable Solutions\n' "$d" "$d" > "$dir/LEARNED_GLOBAL/$d.md"
   done
-  # seed della config multi-root del dashboard (commentata): l'utente la popola quando vuole.
+  # seed the dashboard multi-root config (commented): the user fills it in when they want.
   if [ ! -f "$dir/dashboard.roots" ]; then
     cat > "$dir/dashboard.roots" <<'EOF'
 # keel dashboard — one path per line: a ROOT to scan, or an explicit PROJECT dir (has design-log/).
@@ -370,9 +370,9 @@ EOF
 }
 
 # ============================================================================
-# Comandi orchestratori (standalone) — marker di sessione, gate del metodo,
-# scaffolding di un progetto nuovo. Portati dal metodo comando-based e resi
-# self-contained nel plugin (niente ~/.claude-method: i file-metodo vivono qui).
+# Orchestrator commands (standalone) — session marker, method gates,
+# scaffolding of a new project. Ported from the command-based method and made
+# self-contained in the plugin (no ~/.claude-method: the method files live here).
 # ============================================================================
 
 iso_now() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
@@ -580,27 +580,27 @@ cmd_focus_check() {
   echo "focus_lines=$lines"; echo "focus_bloat=$bloat"; echo "focus_bloat_threshold=$threshold"
 }
 
-# Scaffolding STANDALONE: crea la struttura design-log/ di un progetto nuovo.
-# I file-metodo (BEHAVIORS/METHODOLOGY) sono SYMLINK al plugin → niente ~/.claude-method.
-# Gli altri file per-progetto sono creati da template SOLO se mancano (idempotente).
+# STANDALONE scaffolding: creates the design-log/ structure of a new project.
+# The method files (BEHAVIORS/METHODOLOGY) are SYMLINKS to the plugin → no ~/.claude-method.
+# The other per-project files are created from templates ONLY if missing (idempotent).
 cmd_scaffold() {
   local DLD="$DL"
   mkdir -p "$DLD/sessions" "$DLD/issues" 2>/dev/null
   ln -sfn "$PLUGIN_ROOT/design-log/BEHAVIORS.md"   "$DLD/BEHAVIORS.md"
   ln -sfn "$PLUGIN_ROOT/design-log/METHODOLOGY.md" "$DLD/METHODOLOGY.md"
-  [ -f "$DLD/PROJECT.md" ] || printf '# Project\n\n> Descrivi qui cos'\''è questo progetto, lo scopo, lo stack, l'\''architettura.\n> `/startsession` su PROJECT.md vuoto attiva il Project Discovery Mode.\n\n[Vuoto]\n' > "$DLD/PROJECT.md"
-  [ -f "$DLD/BEHAVIORS_LOCAL.md" ] || printf '# Behaviors Local\n\n> Regole comportamentali specifiche di questo progetto. Lette ogni sessione insieme a BEHAVIORS.md.\n\n---\n\n## Regole Comportamentali\n\n[Vuoto]\n' > "$DLD/BEHAVIORS_LOCAL.md"
-  [ -f "$DLD/PROJECT_UPDATES.md" ] || printf '# Project Updates\n\n> Contesto/convenzioni/decisioni operative specifici del progetto.\n\n---\n\n## Contesto / Convenzioni del Progetto\n\n[Vuoto]\n' > "$DLD/PROJECT_UPDATES.md"
-  [ -f "$DLD/FOCUS.md" ] || printf '# 🎯 FOCUS — Obiettivo corrente\n\n> Letto per PRIMO ogni sessione. Le poche cose in volo ORA. UNA sola 🔄 in corso per volta.\n> Stati: 🔄 in corso · 🧪 implementato, da validare · ⏸️ in coda.\n\n## In volo\n\n*(vuoto)*\n' > "$DLD/FOCUS.md"
-  [ -f "$DLD/INBOX.md" ] || printf '# 📥 INBOX — Cattura grezza (da triagiare)\n\n> Tutto ciò che l'\''utente dice "segna" entra QUI subito, prima di agire.\n\n## Da triagiare\n\n*(vuoto)*\n' > "$DLD/INBOX.md"
-  [ -f "$DLD/PROGRESS.md" ] || printf '# Project Progress (indice)\n\n> Last updated: scaffold\n\n## Stato rapido\n- 🎯 Obiettivo corrente → [FOCUS.md](./FOCUS.md) · 📥 → [INBOX.md](./INBOX.md)\n- 📋 TODO aperti: 0 → [TODO.md](./TODO.md)\n- 🐛 Bug: 0 → [TO_FIX.md](./TO_FIX.md)\n- 🧪 Da validare: 0 → [TO_TEST.md](./TO_TEST.md)\n- ✅ → [DONE.md](./DONE.md) · 🔧 → [FIXED.md](./FIXED.md)\n- 🗄️ → [progress.old.md](./progress.old.md)\n\n## Quick Links\n- [PROJECT.md](./PROJECT.md) · [Sessions](./sessions/) · [Issues](./issues/_INDEX.md)\n' > "$DLD/PROGRESS.md"
-  [ -f "$DLD/TODO.md" ]     || printf '# TODO - Da fare\n\n### 🔴 High Priority\n\n### 🟡 Medium Priority\n\n### 🟢 Low Priority / Ideas\n' > "$DLD/TODO.md"
-  [ -f "$DLD/TO_FIX.md" ]   || printf '# TO_FIX - Bug da fixare\n\n### 🔴 CRITICO\n\n### 🟡 MEDIA\n\n### 🟢 BASSA\n' > "$DLD/TO_FIX.md"
-  [ -f "$DLD/TO_TEST.md" ]  || printf '# TO_TEST - Implementato, da validare\n' > "$DLD/TO_TEST.md"
-  [ -f "$DLD/DONE.md" ]     || printf '# DONE - Lavoro completato (recente)\n' > "$DLD/DONE.md"
-  [ -f "$DLD/FIXED.md" ]    || printf '# FIXED - Bug risolti (recente)\n' > "$DLD/FIXED.md"
-  [ -f "$DLD/progress.old.md" ] || printf '# Progress Archive\n\n> Archivio entry DONE/FIXED vecchie.\n' > "$DLD/progress.old.md"
-  [ -f "$DLD/LEARNED.md" ]  || printf '# Learned - Memoria di Apprendimento (locale)\n\n> Conoscenza tecnica specifica di questo progetto. Letta a ogni /startsession.\n\n## Pattern Tecnici\n\n## Errori da Non Ripetere\n\n## Preferenze Utente\n\n## Soluzioni Riutilizzabili\n' > "$DLD/LEARNED.md"
+  [ -f "$DLD/PROJECT.md" ] || printf '# Project\n\n> Describe here what this project is, its purpose, the stack, the architecture.\n> `/startsession` on an empty PROJECT.md triggers Project Discovery Mode.\n\n[Empty]\n' > "$DLD/PROJECT.md"
+  [ -f "$DLD/BEHAVIORS_LOCAL.md" ] || printf '# Behaviors Local\n\n> Behavioral rules specific to this project. Read every session together with BEHAVIORS.md.\n\n---\n\n## Behavioral Rules\n\n[Empty]\n' > "$DLD/BEHAVIORS_LOCAL.md"
+  [ -f "$DLD/PROJECT_UPDATES.md" ] || printf '# Project Updates\n\n> Project-specific context/conventions/operational decisions.\n\n---\n\n## Project Context / Conventions\n\n[Empty]\n' > "$DLD/PROJECT_UPDATES.md"
+  [ -f "$DLD/FOCUS.md" ] || printf '# 🎯 FOCUS — Current objective\n\n> Read FIRST every session. The few things in flight NOW. Only ONE 🔄 in progress at a time.\n> States: 🔄 in progress · 🧪 implemented, to validate · ⏸️ queued.\n\n## In flight\n\n*(empty)*\n' > "$DLD/FOCUS.md"
+  [ -f "$DLD/INBOX.md" ] || printf '# 📥 INBOX — Raw capture (to triage)\n\n> Anything the user says to capture goes HERE right away, before acting.\n\n## To triage\n\n*(empty)*\n' > "$DLD/INBOX.md"
+  [ -f "$DLD/PROGRESS.md" ] || printf '# Project Progress (index)\n\n> Last updated: scaffold\n\n## Quick status\n- 🎯 Current objective → [FOCUS.md](./FOCUS.md) · 📥 → [INBOX.md](./INBOX.md)\n- 📋 Open TODOs: 0 → [TODO.md](./TODO.md)\n- 🐛 Bugs: 0 → [TO_FIX.md](./TO_FIX.md)\n- 🧪 To validate: 0 → [TO_TEST.md](./TO_TEST.md)\n- ✅ → [DONE.md](./DONE.md) · 🔧 → [FIXED.md](./FIXED.md)\n- 🗄️ → [progress.old.md](./progress.old.md)\n\n## Quick Links\n- [PROJECT.md](./PROJECT.md) · [Sessions](./sessions/) · [Issues](./issues/_INDEX.md)\n' > "$DLD/PROGRESS.md"
+  [ -f "$DLD/TODO.md" ]     || printf '# TODO - To do\n\n### 🔴 High Priority\n\n### 🟡 Medium Priority\n\n### 🟢 Low Priority / Ideas\n' > "$DLD/TODO.md"
+  [ -f "$DLD/TO_FIX.md" ]   || printf '# TO_FIX - Bugs to fix\n\n### 🔴 CRITICAL\n\n### 🟡 MEDIUM\n\n### 🟢 LOW\n' > "$DLD/TO_FIX.md"
+  [ -f "$DLD/TO_TEST.md" ]  || printf '# TO_TEST - Implemented, to validate\n' > "$DLD/TO_TEST.md"
+  [ -f "$DLD/DONE.md" ]     || printf '# DONE - Completed work (recent)\n' > "$DLD/DONE.md"
+  [ -f "$DLD/FIXED.md" ]    || printf '# FIXED - Fixed bugs (recent)\n' > "$DLD/FIXED.md"
+  [ -f "$DLD/progress.old.md" ] || printf '# Progress Archive\n\n> Archive of old DONE/FIXED entries.\n' > "$DLD/progress.old.md"
+  [ -f "$DLD/LEARNED.md" ]  || printf '# Learned - Learning memory (local)\n\n> Technical knowledge specific to this project. Read at every /startsession.\n\n## Technical Patterns\n\n## Mistakes Not to Repeat\n\n## User Preferences\n\n## Reusable Solutions\n' > "$DLD/LEARNED.md"
   [ -f "$DLD/issues/_INDEX.md" ] || printf '# Issues Index\n\n> Stats: 🔴 0 | 🟡 0 | ✅ 0 | ❌ 0\n\n## 🐛 Bugs\n\n*No bugs yet*\n\n## ✨ Enhancements\n\n*No enhancements yet*\n' > "$DLD/issues/_INDEX.md"
   echo "scaffold OK: $DLD"
 }
