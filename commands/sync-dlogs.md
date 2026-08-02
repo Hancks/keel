@@ -1,141 +1,141 @@
 # Sync Design Logs Command
 
-Safety net per sincronizzare i file quando Claude dimentica di aggiornarli.
+A safety net to sync the files when Claude forgets to update them.
 
-## Quando usarlo
+## When to use
 
-- Dopo che Claude completa un task ma non aggiorna i file
-- Quando non sei sicuro se i file sono sincronizzati
-- Prima di /savesession (come double-check)
-- Dopo modifiche significative
-
----
-
-## STEP OBBLIGATORI
-
-### STEP 1: Analizza conversazione recente
-
-Identifica:
-- Task completati
-- Decisioni prese
-- File modificati
-- Design log creati/aggiornati
-
-**OUTPUT OBBLIGATORIO:**
-```
-🔍 Analisi conversazione:
-- Task completati: [lista]
-- Decisioni prese: [lista]
-- File modificati: [lista]
-- Design log coinvolti: [lista o "nessuno"]
-```
+- After Claude completes a task but does not update the files
+- When you are not sure whether the files are in sync
+- Before /savesession (as a double-check)
+- After significant changes
 
 ---
 
-### STEP 2: Verifica i file di tracking (split per-tipo)
+## MANDATORY STEPS
 
-Controlla se sono aggiornati. Il tracking è spezzato per tipo; `PROGRESS.md` è solo l'indice (vedi METHODOLOGY).
+### STEP 1: Analyze the recent conversation
 
-**Checklist da verificare:**
-- [ ] `INBOX.md` triagato (nessuna richiesta grezza dimenticata)?
-- [ ] `FOCUS.md` riflette l'obiettivo corrente (UNA sola 🔄 in corso)?
-- [ ] In `DONE.md`/`FIXED.md` SOLO lavoro **validato** (implementato-non-validato → `TO_TEST.md` + `FOCUS.md` 🧪, BEHAVIORS R.16)?
-- [ ] Task validati con What/How/Files/Notes e rimossi da TODO/TO_FIX/TO_TEST + FOCUS?
-- [ ] Nuovi TODO/bug in `TODO.md`/`TO_FIX.md`?
-- [ ] `DONE.md`/`FIXED.md` sotto ~400 righe (oltre → archivia in `progress.old.md`)?
-- [ ] `PROGRESS.md` indice: "Last updated" + contatori + link corretti?
-- [ ] Fallback: progetto non migrato (file split vuoti) → verifica la sezione DONE/TODO di `PROGRESS.md`
+Identify:
+- Completed tasks
+- Decisions made
+- Files modified
+- Design logs created/updated
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
+```
+🔍 Conversation analysis:
+- Completed tasks: [list]
+- Decisions made: [list]
+- Files modified: [list]
+- Design logs involved: [list or "none"]
+```
+
+---
+
+### STEP 2: Verify the tracking files (split by type)
+
+Check whether they are up to date. The tracking is split by type; `PROGRESS.md` is only the index (see METHODOLOGY).
+
+**Checklist to verify:**
+- [ ] `INBOX.md` triaged (no raw request forgotten)?
+- [ ] `FOCUS.md` reflects the current objective (only ONE 🔄 in progress)?
+- [ ] In `DONE.md`/`FIXED.md` ONLY **validated** work (implemented-not-validated → `TO_TEST.md` + `FOCUS.md` 🧪, BEHAVIORS R.16)?
+- [ ] Validated tasks with What/How/Files/Notes and removed from TODO/TO_FIX/TO_TEST + FOCUS?
+- [ ] New TODOs/bugs in `TODO.md`/`TO_FIX.md`?
+- [ ] `DONE.md`/`FIXED.md` under ~400 lines (over → archive in `progress.old.md`)?
+- [ ] `PROGRESS.md` index: "Last updated" + counters + links correct?
+- [ ] Fallback: non-migrated project (empty split files) → check the DONE/TODO section of `PROGRESS.md`
+
+**MANDATORY OUTPUT:**
 ```
 📊 Tracking:
-✅ DONE.md/FIXED.md con What/How/Files
-❌ Mancava entry per [task] in DONE.md → AGGIORNATO
-✅ TODO.md/TO_FIX.md/TO_TEST.md aggiornati · PROGRESS.md indice in sync
+✅ DONE.md/FIXED.md with What/How/Files
+❌ Entry for [task] was missing in DONE.md → UPDATED
+✅ TODO.md/TO_FIX.md/TO_TEST.md updated · PROGRESS.md index in sync
 ```
 
-Se qualcosa manca → AGGIORNALO e mostra ❌ → AGGIORNATO
+If something is missing → UPDATE it and show ❌ → UPDATED
 
 ---
 
-### STEP 3: Verifica Design Log (se esiste)
+### STEP 3: Verify the Design Log (if it exists)
 
-**Checklist da verificare:**
-- [ ] Implementation Results aggiornato?
-- [ ] Implementation Plan spuntato?
-- [ ] Status corretto?
+**Checklist to verify:**
+- [ ] Implementation Results updated?
+- [ ] Implementation Plan checked off?
+- [ ] Status correct?
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-📝 Design log [nome]:
-✅ Implementation Results aggiornato
-❌ Implementation Plan non spuntato → AGGIORNATO
+📝 Design log [name]:
+✅ Implementation Results updated
+❌ Implementation Plan not checked off → UPDATED
 ✅ Status: Implementing
 ```
 
-Se non c'è design log:
+If there is no design log:
 ```
-📝 Design log: nessuno coinvolto
+📝 Design log: none involved
 ```
 
 ---
 
-### STEP 4: Verifica Session Log (se necessario)
+### STEP 4: Verify the Session Log (if needed)
 
-**Checklist da verificare:**
-- [ ] Sessione lunga (15+ scambi)?
-- [ ] Nuove skill/procedure da documentare?
-- [ ] Tentativi falliti da registrare?
-- [ ] Preferenze utente scoperte?
+**Checklist to verify:**
+- [ ] Long session (15+ exchanges)?
+- [ ] New skills/procedures to document?
+- [ ] Failed attempts to record?
+- [ ] User preferences discovered?
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
 📅 Session log:
-⚠️ Sessione lunga (20+ scambi) - considera /savesession
-✅ Nessun tentativo fallito da registrare
-✅ Nessuna preferenza nuova
+⚠️ Long session (20+ exchanges) - consider /savesession
+✅ No failed attempts to record
+✅ No new preferences
 ```
 
 ---
 
-### STEP 5: Riepilogo finale
+### STEP 5: Final summary
 
-**OUTPUT OBBLIGATORIO:**
+**MANDATORY OUTPUT:**
 ```
-🔄 SYNC COMPLETATO
+🔄 SYNC COMPLETED
 
-Aggiornamenti effettuati:
-✅ Tracking (DONE/FIXED/TODO/TO_FIX/TO_TEST + PROGRESS indice) - [cosa aggiornato]
-✅ design-log/[nome].md - [cosa aggiornato]
-⏭️ Session log - già in sync
+Updates made:
+✅ Tracking (DONE/FIXED/TODO/TO_FIX/TO_TEST + PROGRESS index) - [what was updated]
+✅ design-log/[name].md - [what was updated]
+⏭️ Session log - already in sync
 
-Totale: [X] file aggiornati, [Y] già in sync
+Total: [X] files updated, [Y] already in sync
 
-⚠️ Suggerimento: [se necessario, es. "considera /savesession"]
+⚠️ Suggestion: [if needed, e.g. "consider /savesession"]
 ```
 
-Se tutto era già sincronizzato:
+If everything was already in sync:
 ```
-✅ TUTTO IN SYNC
+✅ ALL IN SYNC
 
-Nessun aggiornamento necessario.
+No update needed.
 
-Ultimo aggiornamento:
-- Tracking (PROGRESS.md indice + file split): [timestamp]
-- Design log attivo: [nome o "nessuno"]
-- Ultima sessione: [timestamp]
+Last update:
+- Tracking (PROGRESS.md index + split files): [timestamp]
+- Active design log: [name or "none"]
+- Last session: [timestamp]
 ```
 
 ---
 
-## Checklist di verifica per l'utente
+## Verification checklist for the user
 
-Dopo che Claude esegue `/sync-dlogs`, verifica:
+After Claude runs `/sync-dlogs`, check:
 
-- [ ] Ha analizzato la conversazione?
-- [ ] Ha verificato i file di tracking (DONE/FIXED/TODO/TO_FIX/TO_TEST + PROGRESS.md indice)?
-- [ ] Ha verificato design log (se esiste)?
-- [ ] Ha considerato session log?
-- [ ] Ha mostrato riepilogo con ✅/❌?
+- [ ] Did it analyze the conversation?
+- [ ] Did it verify the tracking files (DONE/FIXED/TODO/TO_FIX/TO_TEST + PROGRESS.md index)?
+- [ ] Did it verify the design log (if it exists)?
+- [ ] Did it consider the session log?
+- [ ] Did it show a summary with ✅/❌?
 
-Se manca qualcosa, Claude non ha seguito il comando correttamente.
+If something is missing, Claude did not follow the command correctly.
