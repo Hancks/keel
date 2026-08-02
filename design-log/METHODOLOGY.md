@@ -1,110 +1,110 @@
-# Design-Log Methodology - Guida Completa
+# Design-Log Methodology - Complete Guide
 
-> Questo file contiene la metodologia dettagliata. Per le istruzioni essenziali, vedi `CLAUDE.md` nella root.
+> This file contains the detailed methodology. For the essential instructions, see `CLAUDE.md` in the root.
 
 ## Overview
 
-Questo progetto usa la **Design-Log Methodology** (ispirata a [Wix Engineering](https://www.wix.engineering/post/why-i-stop-prompting-and-start-logging-the-design-log-methodology)). Claude non è solo un coder, ma un **partner nel processo architetturale**.
+This project uses the **Design-Log Methodology** (inspired by [Wix Engineering](https://www.wix.engineering/post/why-i-stop-prompting-and-start-logging-the-design-log-methodology)). Claude is not just a coder, but a **partner in the architectural process**.
 
 ## Core Principles
 
-1. **Design Before You Implement**: Un design log deve essere creato e approvato PRIMA di scrivere codice.
+1. **Design Before You Implement**: A design log must be created and approved BEFORE writing code.
 
-2. **Immutable History**: Una volta iniziata l'implementazione, la sezione "Design" è FROZEN. Le modifiche vanno in "Implementation Results".
+2. **Immutable History**: Once implementation begins, the "Design" section is FROZEN. Changes go to "Implementation Results".
 
-3. **The Socratic Method**: Per informazioni mancanti, FAI DOMANDE nel design log. Non assumere, chiedi.
+3. **The Socratic Method**: For missing information, ASK QUESTIONS in the design log. Don't assume, ask.
 
-4. **Traceable Implementation**: Se devii dal piano, documenta PERCHÉ in "Implementation Results".
+4. **Traceable Implementation**: If you deviate from the plan, document WHY in "Implementation Results".
 
 ---
 
-## Struttura Completa delle Cartelle
+## Complete Folder Structure
 
 ```
 ./design-log/
-├── PROJECT.md                          # Overview del progetto (stabile)
-├── FOCUS.md                            # 🎯 Obiettivo corrente — letto per PRIMO ogni sessione
-├── INBOX.md                            # 📥 Cattura grezza ("segna"), da triagiare
-├── PROGRESS.md                         # Indice leggero → punta ai file sotto
-├── TODO.md                             # Cose da fare (feature, miglioramenti) — backlog curato
-├── TO_FIX.md                           # Bug da fixare
-├── TO_TEST.md                          # IMPLEMENTATO ma non validato (attende l'occhio dell'utente)
-├── DONE.md                             # Lavoro VALIDATO (recente)
-├── FIXED.md                            # Bug VALIDATI (recente)
-├── progress.old.md                     # Archivio sessioni vecchie
-├── METHODOLOGY.md                      # Questo file
-├── BEHAVIORS.md                        # Regole comportamentali per Claude
-├── LEARNED.md                          # Competenze tecniche riutilizzabili
-├── sessions/                           # Log delle sessioni
-│   └── YYYY-MM-DD-HH-MM.md            # Sessioni (la più recente per nome è "latest")
+├── PROJECT.md                          # Project overview (stable)
+├── FOCUS.md                            # 🎯 Current objective — read FIRST every session
+├── INBOX.md                            # 📥 Raw capture ("note"), to triage
+├── PROGRESS.md                         # Light index → points to the files below
+├── TODO.md                             # Things to do (features, improvements) — curated backlog
+├── TO_FIX.md                           # Bugs to fix
+├── TO_TEST.md                          # IMPLEMENTED but not validated (awaits the user's eyes)
+├── DONE.md                             # VALIDATED work (recent)
+├── FIXED.md                            # VALIDATED bugs (recent)
+├── progress.old.md                     # Archive of old sessions
+├── METHODOLOGY.md                      # This file
+├── BEHAVIORS.md                        # Behavioral rules for Claude
+├── LEARNED.md                          # Reusable technical knowledge
+├── sessions/                           # Session logs
+│   └── YYYY-MM-DD-HH-MM.md            # Sessions (the most recent by name is "latest")
 ├── issues/                             # Issue tracking
-│   ├── _INDEX.md                       # Indice issue
-│   └── {TYPE}-{NNN}-{slug}.md         # Singole issue
-└── YYYY-MM-DD-feature-name.md          # Design decisions (immutabili dopo approvazione)
+│   ├── _INDEX.md                       # Issue index
+│   └── {TYPE}-{NNN}-{slug}.md         # Individual issues
+└── YYYY-MM-DD-feature-name.md          # Design decisions (immutable after approval)
 ```
 
-**Nota sulla struttura progress (split per-tipo):**
-- `PROGRESS.md` è solo un **indice leggero**: header + contatori (TODO aperti, bug aperti, ultima sessione) + link ai file sotto. NON contiene più entry-log corpose.
-- Il lavoro è suddiviso in file separati per tipo: `TODO.md` / `TO_FIX.md` / `TO_TEST.md` (lavoro corrente) e `DONE.md` / `FIXED.md` (completato recente, con entry ricche What/How/Files/Notes).
-- `progress.old.md` è l'**archivio**: quando `DONE.md` o `FIXED.md` superano **~400 righe**, le entry più vecchie vengono spostate qui (mantiene i file di lavoro sotto il limite pratico di lettura di Claude).
-- **Sempre attivo**: `/savesession` e `/add-task` instradano direttamente le voci nei file split (non in PROGRESS.md). Vedi sezione "Dopo Ogni Task".
-- **Perché lo split** (motivo originale): impedire che un singolo file di progress cresca oltre il limite di lettura di Claude in una tool call (PROGRESS monolitico >~500-1500 righe → si tronca → `/startsession` perde pezzi).
-- **Retro-compatibilità (lettura)**: `/startsession` legge i file split; se sono assenti o vuoti fa **fallback su `PROGRESS.md`** (progetti non ancora migrati continuano a funzionare e migrano organicamente al primo `/savesession`).
-- **GATE forzante di migrazione (STEP 1.7 di `/startsession`)**: la retro-compatibilità sopra è *prosa* e veniva saltata (Claude legge solo la testa di un PROGRESS monolitico → perde il `## TODO` in coda; incidente 2026-06-02). Per renderla non-skippabile, `/startsession` esegue `.claude/scripts/lock.sh progress-check` che restituisce un `verdict` machine-readable: `MIGRATED` / `MONOLITH_SMALL` (leggi PROGRESS per intero) / `MIGRATE_REQUIRED` (⛔ migrazione **bloccante** verso i file split prima di proseguire, con re-check `MIGRATED` a conferma) / `PROGRESS_MISSING`. La detection è nello script (impossibile da falsare); lo slicing in file resta a Claude (serve giudizio per classificare le voci). Soglia monolite: `> 250` righe con sezioni `## DONE/TODO/TO_FIX` e ≥3 entry `### `.
+**Note on the progress structure (split by type):**
+- `PROGRESS.md` is only a **light index**: header + counters (open TODOs, open bugs, last session) + links to the files below. It no longer contains bulky log entries.
+- The work is split into separate files by type: `TODO.md` / `TO_FIX.md` / `TO_TEST.md` (current work) and `DONE.md` / `FIXED.md` (recently completed, with rich What/How/Files/Notes entries).
+- `progress.old.md` is the **archive**: when `DONE.md` or `FIXED.md` exceed **~400 lines**, the oldest entries are moved here (keeping the working files under Claude's practical reading limit).
+- **Always active**: `/savesession` and `/add-task` route the items directly into the split files (not into PROGRESS.md). See the "After Each Task" section.
+- **Why the split** (original reason): to prevent a single progress file from growing beyond Claude's reading limit in a tool call (a monolithic PROGRESS >~500-1500 lines → gets truncated → `/startsession` loses pieces).
+- **Backward compatibility (reading)**: `/startsession` reads the split files; if they are absent or empty it **falls back to `PROGRESS.md`** (not-yet-migrated projects keep working and migrate organically at the first `/savesession`).
+- **FORCING migration GATE (STEP 1.7 of `/startsession`)**: the backward compatibility above is *prose* and was being skipped (Claude reads only the head of a monolithic PROGRESS → loses the `## TODO` at the bottom; incident 2026-06-02). To make it non-skippable, `/startsession` runs `.claude/scripts/lock.sh progress-check` which returns a machine-readable `verdict`: `MIGRATED` / `MONOLITH_SMALL` (read PROGRESS in full) / `MIGRATE_REQUIRED` (⛔ **blocking** migration to the split files before proceeding, with a `MIGRATED` re-check to confirm) / `PROGRESS_MISSING`. The detection is in the script (impossible to fake); the slicing into files is left to Claude (judgment is needed to classify the entries). Monolith threshold: `> 250` lines with `## DONE/TODO/TO_FIX` sections and ≥3 `### ` entries.
 
-**Nota sui design log attivi:** I file `YYYY-MM-DD-feature-name.md` con Status diverso da "Implemented" sono design in corso e vanno letti durante `/startsession` per mantenere contesto sulle decisioni architetturali in progress.
+**Note on active design logs:** The `YYYY-MM-DD-feature-name.md` files with a Status other than "Implemented" are designs in progress and must be read during `/startsession` to keep context on the in-progress architectural decisions.
 
 ---
 
-## Il ciclo di vita del lavoro (pipeline) — `INBOX → … → DONE`
+## The lifecycle of work (pipeline) — `INBOX → … → DONE`
 
-> Introdotto 2026-06-24 (design log `2026-06-24-rafforzamento-metodo.md` nel meta-progetto). Nasce per tre debolezze reali: richieste perse tra i turni, TODO gonfio illeggibile, "implementato" scambiato per "fatto". Ogni voce di lavoro ha **una sola casa per volta**; lo spostamento tra le case è il flusso qui sotto.
+> Introduced 2026-06-24 (design log `2026-06-24-rafforzamento-metodo.md` in the meta-project). Born from three real weaknesses: requests lost between turns, a bloated unreadable TODO, "implemented" mistaken for "done". Every work item has **one home at a time**; the movement between homes is the flow below.
 
 ```
-   richiesta dell'utente / "segna X"
-        │  ① CATTURA  — istantanea, PRIMA di agire           (BEHAVIORS R.15)
+   user request / "note X"
+        │  ① CAPTURE  — instant, BEFORE acting               (BEHAVIORS R.15)
         ▼
-   INBOX.md            grezzo, non ordinato
-        │  ② TRIAGE  — a /add-task · su "go" a un task · on-demand · /savesession (bloccante)
-        ├──────────────► 🗑 cestino (scartato con un perché)
+   INBOX.md            raw, unordered
+        │  ② TRIAGE  — at /add-task · on "go" for a task · on-demand · /savesession (blocking)
+        ├──────────────► 🗑 trash (dropped with a why)
         ▼
-   TODO.md / TO_FIX.md   backlog completo, prioritizzato (🔴🟡🟢)
-        │  ③ porto nel lavoro corrente
+   TODO.md / TO_FIX.md   full backlog, prioritized (🔴🟡🟢)
+        │  ③ bring into the current work
         ▼
-   FOCUS.md            obiettivo ORA: poche voci, UNA sola 🔄 in corso   (BEHAVIORS R.17)
-        │  implemento (tsc/build verde = IMPLEMENTATO, NON "fatto")
+   FOCUS.md            objective NOW: few items, only ONE 🔄 in progress   (BEHAVIORS R.17)
+        │  implement (green tsc/build = IMPLEMENTED, NOT "done")
         ▼
-   TO_TEST.md          implementato, attende l'occhio dell'utente
-        │  ④ l'utente valida a video ✅                       (BEHAVIORS R.16)
+   TO_TEST.md          implemented, awaits the user's eyes
+        │  ④ the user validates on screen ✅                  (BEHAVIORS R.16)
         ▼
-   DONE.md / FIXED.md   VALIDATO = fatto davvero
-        │  archiviazione a ~400 righe
+   DONE.md / FIXED.md   VALIDATED = really done
+        │  archiving at ~400 lines
         ▼
    progress.old.md
 ```
 
-### Tabella lifecycle (cosa contiene · quando ENTRA · quando/dove ESCE)
+### Lifecycle table (what it holds · when an item ENTERS · when/where it EXITS)
 
-| File | Cosa contiene | Quando ENTRA una voce | Quando/dove ESCE |
-|------|---------------|------------------------|------------------|
-| `INBOX.md` | richieste/idee grezze appena catturate | appena l'utente chiede qualcosa o dice **"segna"** — *istantaneo, prima di agire* | al **triage** → `TODO`/`TO_FIX` o 🗑 |
-| `FOCUS.md` | obiettivo corrente: poche voci in volo, **1 `🔄` in corso** | quando porto una voce di `TODO` nel lavoro attivo | quando la feature è **validata** (la chiusura va in `DONE`) |
-| `TODO.md` | backlog completo prioritizzato | dal triage di `INBOX` o pianificazione diretta | quando entra in `FOCUS` (lavoro) o è validata → `DONE`; **rimozione forzata** alla chiusura |
-| `TO_FIX.md` | bug aperti | triage / scoperta bug | quando fixato **e validato** → `FIXED` |
-| `TO_TEST.md` | **implementato ma NON validato** (attende l'utente) | quando una feature/fix è implementata (build verde) e serve l'occhio dell'utente | quando l'utente valida → `DONE`/`FIXED`; la voce esce |
-| `DONE.md` | feature **VALIDATE** | **solo dopo** validazione utente | archiviazione a ~400 righe → `progress.old` |
-| `FIXED.md` | bug **VALIDATI** | **solo dopo** validazione utente | archiviazione → `progress.old` |
-| `progress.old.md` | archivio storico | quando `DONE`/`FIXED` > ~400 righe | mai (archivio) |
+| File | What it holds | When an item ENTERS | When/where it EXITS |
+|------|---------------|---------------------|---------------------|
+| `INBOX.md` | raw requests/ideas just captured | as soon as the user asks something or says **"note"** — *instant, before acting* | at **triage** → `TODO`/`TO_FIX` or 🗑 |
+| `FOCUS.md` | current objective: few in-flight items, **1 `🔄` in progress** | when I bring a `TODO` item into the active work | when the feature is **validated** (the closing goes to `DONE`) |
+| `TODO.md` | full prioritized backlog | from the triage of `INBOX` or direct planning | when it enters `FOCUS` (work) or is validated → `DONE`; **forced removal** at closing |
+| `TO_FIX.md` | open bugs | triage / bug discovery | when fixed **and validated** → `FIXED` |
+| `TO_TEST.md` | **implemented but NOT validated** (awaits the user) | when a feature/fix is implemented (green build) and needs the user's eyes | when the user validates → `DONE`/`FIXED`; the item exits |
+| `DONE.md` | **VALIDATED** features | **only after** user validation | archiving at ~400 lines → `progress.old` |
+| `FIXED.md` | **VALIDATED** bugs | **only after** user validation | archiving → `progress.old` |
+| `progress.old.md` | historical archive | when `DONE`/`FIXED` > ~400 lines | never (archive) |
 
-### Le tre regole che reggono la pipeline (vedi BEHAVIORS.md)
+### The three rules that hold the pipeline together (see BEHAVIORS.md)
 
-- **Cattura-all'istante (R.15)**: ogni richiesta si **scrive prima di agire**. "segna" → `INBOX.md`. Vietato "me lo ricordo".
-- **Done = validato (R.16)**: `tsc`/build verde = *implementato*, non *fatto*. In `DONE`/`FIXED` si entra **solo** dopo che l'utente l'ha visto funzionare (passaggio da `TO_TEST`).
-- **Una feature alla volta + FOCUS-first (R.17)**: `FOCUS.md` si legge per primo; una sola voce `🔄 in corso` fino a validata.
+- **Capture-instantly (R.15)**: every request is **written before acting**. "note" → `INBOX.md`. Forbidden to say "I'll remember it".
+- **Done = validated (R.16)**: a green `tsc`/build = *implemented*, not *done*. You enter `DONE`/`FIXED` **only** after the user has seen it work (moving from `TO_TEST`).
+- **One feature at a time + FOCUS-first (R.17)**: `FOCUS.md` is read first; only one `🔄 in progress` item until validated.
 
-### Testare = validare
+### Testing = validating
 
-`TO_TEST.md` **non** è più "da testare su device": è lo stato *"implementato, l'utente non l'ha ancora visto"*. Quando l'utente valida, la voce esce e confluisce in `DONE`/`FIXED`. **Non esiste** un file "TESTED" separato (sarebbe un altro file da svuotare).
+`TO_TEST.md` is **no longer** "to test on device": it is the state *"implemented, the user hasn't seen it yet"*. When the user validates, the item exits and flows into `DONE`/`FIXED`. There is **no** separate "TESTED" file (it would be another file to empty).
 
 ---
 
@@ -141,58 +141,58 @@ How to run the project locally (brief commands).
 
 ---
 
-## Template: PROGRESS.md (indice leggero)
+## Template: PROGRESS.md (light index)
 
-`PROGRESS.md` NON contiene più le entry-log: è solo un indice con contatori e link ai file split.
+`PROGRESS.md` no longer contains the log entries: it is only an index with counters and links to the split files.
 
 ```markdown
-# Project Progress (indice)
+# Project Progress (index)
 
 > Last updated: YYYY-MM-DD HH:MM
 > Last session: [link to session file]
 
-## Stato rapido
-- 📋 TODO aperti: N → [TODO.md](./TODO.md)
-- 🐛 Bug da fixare: N → [TO_FIX.md](./TO_FIX.md)
-- 🧪 Da testare: N → [TO_TEST.md](./TO_TEST.md)
-- ✅ Completato recente → [DONE.md](./DONE.md) · 🔧 Bug risolti → [FIXED.md](./FIXED.md)
-- 🗄️ Archivio storico → [progress.old.md](./progress.old.md)
+## Quick status
+- 📋 Open TODOs: N → [TODO.md](./TODO.md)
+- 🐛 Bugs to fix: N → [TO_FIX.md](./TO_FIX.md)
+- 🧪 To validate: N → [TO_TEST.md](./TO_TEST.md)
+- ✅ Recently completed → [DONE.md](./DONE.md) · 🔧 Fixed bugs → [FIXED.md](./FIXED.md)
+- 🗄️ Historical archive → [progress.old.md](./progress.old.md)
 
 ## Open Questions
 - [ ] Question 1
 
 ## Quick Links
-- [PROJECT.md](./PROJECT.md) · [Sessions](./sessions/) (la piu' recente per nome) · [Issues](./issues/_INDEX.md)
+- [PROJECT.md](./PROJECT.md) · [Sessions](./sessions/) (the most recent by name) · [Issues](./issues/_INDEX.md)
 ```
 
-### Template dei file split
+### Templates of the split files
 
-`FOCUS.md` (obiettivo corrente — letto per PRIMO ogni sessione):
+`FOCUS.md` (current objective — read FIRST every session):
 ```markdown
-# 🎯 FOCUS — Obiettivo corrente
+# 🎯 FOCUS — Current objective
 
-> Letto per PRIMO ogni sessione. Le poche cose in volo ORA. UNA sola 🔄 in corso per volta.
-> Stati: 🔄 in corso · 🧪 implementato, da validare · ⏸️ in coda. "Fatto" = validato dall'utente a video.
+> Read FIRST every session. The few things in flight NOW. Only ONE 🔄 in progress at a time.
+> States: 🔄 in progress · 🧪 implemented, to validate · ⏸️ queued. "Done" = validated by the user on screen.
 
-## In volo
-- 🔄 [feature] — criterio di fatto: [come si vede che funziona] — [link TODO/design log]
-- ⏸️ [feature in coda]
+## In flight
+- 🔄 [feature] — done criterion: [how you see it works] — [TODO/design log link]
+- ⏸️ [queued feature]
 ```
 
-`INBOX.md` (cattura grezza — "segna"):
+`INBOX.md` (raw capture — "note"):
 ```markdown
-# 📥 INBOX — Cattura grezza (da triagiare)
+# 📥 INBOX — Raw capture (to triage)
 
-> Tutto ciò che l'utente dice "segna", o chiede al volo, entra QUI subito, prima di agire.
-> NON è la lista ufficiale: si triaga (→ TODO/TO_FIX o 🗑) a /add-task, on-demand, e a /savesession.
+> Anything the user says to capture, or asks on the fly, goes HERE right away, before acting.
+> It is NOT the official list: it is triaged (→ TODO/TO_FIX or 🗑) at /add-task, on-demand, and at /savesession.
 
-## Da triagiare
-- [ ] [richiesta/idea grezza] (segnato: YYYY-MM-DD)
+## To triage
+- [ ] [raw request/idea] (captured: YYYY-MM-DD)
 ```
 
-`TODO.md` (feature/miglioramenti):
+`TODO.md` (features/improvements):
 ```markdown
-# TODO - Da fare
+# TODO - To do
 
 ### 🔴 High Priority
 #### [Task Name]
@@ -205,24 +205,24 @@ How to run the project locally (brief commands).
 ### 🟢 Low Priority / Ideas
 ```
 
-`TO_FIX.md` (bug aperti):
+`TO_FIX.md` (open bugs):
 ```markdown
-# TO_FIX - Bug da fixare
+# TO_FIX - Bugs to fix
 
-### 🔴 CRITICO
-### 🟡 MEDIA
-### 🟢 BASSA
+### 🔴 CRITICAL
+### 🟡 MEDIUM
+### 🟢 LOW
 ```
 
-`TO_TEST.md` (implementato, da validare — l'utente non l'ha ancora visto):
+`TO_TEST.md` (implemented, to validate — the user hasn't seen it yet):
 ```markdown
-# TO_TEST - Implementato, da validare
-- [ ] [cosa l'utente deve vedere funzionare] (da: [task/sessione/feature in FOCUS])
+# TO_TEST - Implemented, to validate
+- [ ] [what the user must see working] (from: [task/session/feature in FOCUS])
 ```
 
-`DONE.md` (completato recente) e `FIXED.md` (bug risolti recenti) — entry ricche:
+`DONE.md` (recently completed) and `FIXED.md` (recently fixed bugs) — rich entries:
 ```markdown
-# DONE - Lavoro completato (recente)
+# DONE - Completed work (recent)
 
 ### [Date] - [Feature/Task Name]
 **What:** Brief description
@@ -232,13 +232,13 @@ How to run the project locally (brief commands).
 **Notes:** Gotchas, learnings
 ```
 
-`progress.old.md` (archivio): stesso formato di DONE/FIXED, riceve le entry più vecchie quando DONE.md/FIXED.md superano ~400 righe.
+`progress.old.md` (archive): same format as DONE/FIXED, receives the oldest entries when DONE.md/FIXED.md exceed ~400 lines.
 
 ---
 
 ## Template: Design Log
 
-Per nuove feature o modifiche significative, crea `YYYY-MM-DD-feature-name.md`:
+For new features or significant changes, create `YYYY-MM-DD-feature-name.md`:
 
 ```markdown
 # [Feature/Decision Name]
@@ -301,7 +301,7 @@ High-level approach.
 
 ## Template: Session Log
 
-Salva in `sessions/YYYY-MM-DD-HH-MM.md`:
+Save in `sessions/YYYY-MM-DD-HH-MM.md`:
 
 ```markdown
 # Session Log: YYYY-MM-DD HH:MM
@@ -370,22 +370,22 @@ One paragraph: goal and achievement.
 
 ## Issue Tracking
 
-### Tipi di Issue
-- `bug` - Qualcosa non funziona
-- `enhancement` - Miglioramento a feature esistente
-- `review` - Qualcosa da verificare
+### Issue Types
+- `bug` - Something doesn't work
+- `enhancement` - Improvement to an existing feature
+- `review` - Something to verify
 
-### Severity (bug) / Priority (altri)
+### Severity (bug) / Priority (others)
 - Bug: critical -> major -> minor -> trivial
 - Enhancement/Review: high -> medium -> low
 
 ### Status
-- `in-progress` - In lavorazione
-- `blocked` - Bloccato (specificare perché)
-- `closed` - Completato (documentare soluzione)
-- `rejected` - Non si fa (specificare perché)
+- `in-progress` - Being worked on
+- `blocked` - Blocked (specify why)
+- `closed` - Completed (document the solution)
+- `rejected` - Won't do (specify why)
 
-### Template Issue
+### Issue Template
 
 ```markdown
 # [{TYPE}-{NNN}] {Title}
@@ -430,15 +430,15 @@ Discovered during: [session/context]
 - [ ] Key directories explained
 - [ ] Conventions documented
 
-### PROGRESS.md (indice) + file split
+### PROGRESS.md (index) + split files
 - [ ] "Last updated" current
-- [ ] PROGRESS.md è un indice leggero (contatori + link), non contiene entry-log corpose
-- [ ] `FOCUS.md` riflette l'obiettivo corrente (UNA sola voce 🔄 in corso) ed è aggiornato
-- [ ] `INBOX.md` triagato (nessuna voce grezza dimenticata)
-- [ ] Solo lavoro **validato** in `DONE.md`/`FIXED.md` (l'implementato-non-validato sta in `TO_TEST.md`/`FOCUS.md`)
+- [ ] PROGRESS.md is a light index (counters + links), it does not contain bulky log entries
+- [ ] `FOCUS.md` reflects the current objective (only ONE 🔄 in progress item) and is up to date
+- [ ] `INBOX.md` triaged (no raw item forgotten)
+- [ ] Only **validated** work in `DONE.md`/`FIXED.md` (the implemented-not-validated is in `TO_TEST.md`/`FOCUS.md`)
 - [ ] Completed work in `DONE.md`/`FIXED.md` with How/Files
-- [ ] TODOs in `TODO.md` have proposed approaches; bug in `TO_FIX.md`; implementato-da-validare in `TO_TEST.md`
-- [ ] `DONE.md`/`FIXED.md` sotto ~400 righe (oltre → archiviare in `progress.old.md`)
+- [ ] TODOs in `TODO.md` have proposed approaches; bugs in `TO_FIX.md`; implemented-to-validate in `TO_TEST.md`
+- [ ] `DONE.md`/`FIXED.md` under ~400 lines (over → archive in `progress.old.md`)
 - [ ] Priorities clear · Reference to latest session
 
 ### Design Logs
@@ -459,57 +459,57 @@ Discovered during: [session/context]
 
 ## Project Discovery Mode
 
-Quando `/startsession` trova PROJECT.md vuoto, si attiva il **Project Discovery Mode** che interrompe il flusso normale.
+When `/startsession` finds an empty PROJECT.md, the **Project Discovery Mode** activates and interrupts the normal flow.
 
-### Criterio "PROJECT.md vuoto"
-- Non esiste
-- Esiste ma ha solo titolo, placeholder, template non compilato
-- Nessuna riga con contenuto informativo reale sul progetto
+### "Empty PROJECT.md" criterion
+- Does not exist
+- Exists but has only a title, placeholders, an uncompiled template
+- No line with real informative content about the project
 
-### Due scenari
+### Two scenarios
 
-**Progetto esistente** (ci sono file sorgente, package manager, struttura riconoscibile):
-1. Analisi profonda: struttura, stack, architettura, codice core, config, test, docs
-2. Per progetti grandi (>50 file): parallelizzare con Agent
-3. Presentare deduzioni (natura, scopo, target, stack, architettura, stato)
-4. Chiedere conferma/correzioni
-5. Dopo conferma: popolare PROJECT.md e PROGRESS.md
+**Existing project** (there are source files, a package manager, a recognizable structure):
+1. Deep analysis: structure, stack, architecture, core code, config, tests, docs
+2. For large projects (>50 files): parallelize with Agent
+3. Present the deductions (nature, purpose, target, stack, architecture, state)
+4. Ask for confirmation/corrections
+5. After confirmation: populate PROJECT.md and PROGRESS.md
 
-**Progetto nuovo** (solo file design-log nella directory):
-1. Domande guidate: scopo, target, funzionalità, tech, UI/UX, vincoli
-2. Domande contestuali aggiuntive in base alle risposte
-3. Dopo risposte e conferma: popolare PROJECT.md e PROGRESS.md
+**New project** (only design-log files in the directory):
+1. Guided questions: purpose, target, features, tech, UI/UX, constraints
+2. Additional contextual questions based on the answers
+3. After answers and confirmation: populate PROJECT.md and PROGRESS.md
 
-Dopo la discovery, il flusso normale di /startsession riprende.
+After discovery, the normal /startsession flow resumes.
 
-Dettagli completi: vedi `.claude/commands/startsession.md`
+Full details: see `.claude/commands/startsession.md`
 
 ---
 
-## Sistema Lock di Sessione (`.locks/`)
+## Session Lock System (`.locks/`)
 
-> Cooperative locking file-based per gestire 2+ sessioni Claude in parallelo sullo stesso repo.
+> File-based cooperative locking to manage 2+ parallel Claude sessions on the same repo.
 
-### Entry point unico: `.claude/scripts/lock.sh`
+### Single entry point: `.claude/scripts/lock.sh`
 
-Tutte le operazioni sui lock passano da uno script bash committato `.claude/scripts/lock.sh`. Lo script usa `jq` come tool primario con fallback `python3` interno (per non bloccare se `jq` manca). È auto-approvato in `.claude/settings.json` con la singola permission `Bash(.claude/scripts/lock.sh:*)` — nessun prompt durante `/startsession` e fratelli.
+All lock operations go through a committed bash script `.claude/scripts/lock.sh`. The script uses `jq` as its primary tool with an internal `python3` fallback (so it doesn't block if `jq` is missing). It is auto-approved in `.claude/settings.json` with the single permission `Bash(.claude/scripts/lock.sh:*)` — no prompt during `/startsession` and its siblings.
 
-Sub-comandi:
+Subcommands:
 
-| Sub-comando | Effetto |
+| Subcommand | Effect |
 |---|---|
-| `preflight` | Stampa `jq:OK` o `jq:MISSING` (con avviso). Eseguito a inizio `/startsession`. |
-| `status` | Stampa JSON `{markers: [...], file_locks: [...]}` con tutto lo stato corrente. |
-| `init` | Crea marker `exclusive`. Stampa il nuovo UID su stdout. |
-| `share --uid <uid> <file1> [<file2>...]` | Flip `exclusive→shared` + crea `.lock` per-file. Refusa se uno dei file è già lockato da altri. |
-| `add-file --uid <uid> <file>` | Append di un file al marker shared attivo + crea `.lock`. Idempotente se già self-owned. |
-| `release --uid <uid>` | Rimuove i propri `.lock` per-file + flip `shared→exclusive`. |
-| `end <uid>` | Rimuove `.locks/session-<uid>.json`. |
+| `preflight` | Prints `jq:OK` or `jq:MISSING` (with a warning). Run at the start of `/startsession`. |
+| `status` | Prints JSON `{markers: [...], file_locks: [...]}` with the full current state. |
+| `init` | Creates an `exclusive` marker. Prints the new UID on stdout. |
+| `share --uid <uid> <file1> [<file2>...]` | Flip `exclusive→shared` + create per-file `.lock`s. Refuses if one of the files is already locked by others. |
+| `add-file --uid <uid> <file>` | Append a file to the active shared marker + create a `.lock`. Idempotent if already self-owned. |
+| `release --uid <uid>` | Removes your own per-file `.lock`s + flip `shared→exclusive`. |
+| `end <uid>` | Removes `.locks/session-<uid>.json`. |
 
-### Due livelli di lock
+### Two lock levels
 
-1. **Marker di sessione** — `.locks/session-{uid}.json`
-   Identifica una sessione Claude attiva. Creato da `lock.sh init` (chiamato da `/startsession`), rimosso da `lock.sh end <uid>` (chiamato da `/savesession`).
+1. **Session marker** — `.locks/session-{uid}.json`
+   Identifies an active Claude session. Created by `lock.sh init` (called by `/startsession`), removed by `lock.sh end <uid>` (called by `/savesession`).
    Schema:
    ```json
    {
@@ -521,123 +521,123 @@ Sub-comandi:
    }
    ```
 
-2. **Lock per-file** — `.locks/<path-encoded>.lock`
-   Dichiara intenzione di modificare un file specifico. Creato da `lock.sh share` o `lock.sh add-file` (chiamati da `/startsharedsession`), rimosso da `lock.sh release` (chiamato da `/stopsharedsession`).
-   Naming: `path/to/file.ext` → `path__to__file.ext.lock` (mantiene estensione originale).
-   Schema JSON: `{ owner_uid, file, task, createdAt }`.
+2. **Per-file lock** — `.locks/<path-encoded>.lock`
+   Declares intent to modify a specific file. Created by `lock.sh share` or `lock.sh add-file` (called by `/startsharedsession`), removed by `lock.sh release` (called by `/stopsharedsession`).
+   Naming: `path/to/file.ext` → `path__to__file.ext.lock` (keeps the original extension).
+   JSON schema: `{ owner_uid, file, task, createdAt }`.
 
-### Stati possibili
+### Possible states
 
-| Marker presenti | `type` | Comportamento `/startsession` |
+| Markers present | `type` | `/startsession` behavior |
 |---|---|---|
-| Nessuno | — | Crea proprio marker `exclusive`, procede normale |
-| Tutti `shared` | shared | Segnala + crea proprio marker `exclusive` (READ + non tocca file in `lockedFiles` union) |
-| Almeno uno `exclusive` | exclusive | **READ-ONLY MODE** — non crea marker, non modifica nulla |
+| None | — | Creates its own `exclusive` marker, proceeds normally |
+| All `shared` | shared | Flags them + creates its own `exclusive` marker (READ + does not touch the files in the `lockedFiles` union) |
+| At least one `exclusive` | exclusive | **READ-ONLY MODE** — does not create a marker, does not modify anything |
 
-### Ciclo vita completo
+### Full lifecycle
 
 ```
 /startsession          → lock.sh preflight + lock.sh status + lock.sh init  (exclusive)
-/startsharedsession    → lock.sh share --uid <uid> <files...>               (flip a shared + lock per-file)
-... lavoro ...
-/stopsharedsession     → lock.sh release --uid <uid>                        (rimuove lock + flip a exclusive)
-/savesession           → lock.sh end <uid>                                  (rimuove marker)
+/startsharedsession    → lock.sh share --uid <uid> <files...>               (flip to shared + per-file lock)
+... work ...
+/stopsharedsession     → lock.sh release --uid <uid>                        (removes locks + flip to exclusive)
+/savesession           → lock.sh end <uid>                                  (removes marker)
 ```
 
-### Posizione
+### Location
 
-`.locks/` vive nella **root del repo**, NON in `design-log/`. È in `.gitignore`. Lo script lo crea automaticamente se manca.
+`.locks/` lives in the **repo root**, NOT in `design-log/`. It is in `.gitignore`. The script creates it automatically if missing.
 
-### Recupero da crash
+### Crash recovery
 
-Se una sessione crasha senza chiamare `/savesession` o `/stopsharedsession`, marker e lock restano orfani. Solo l'utente li rimuove (Claude segnala, non agisce):
+If a session crashes without calling `/savesession` or `/stopsharedsession`, markers and locks are left orphaned. Only the user removes them (Claude flags, it does not act):
 ```bash
-rm .locks/session-{uid-orfano}.json
-rm .locks/*.lock   # solo se sicuri non ci sono sessioni attive
+rm .locks/session-{orphan-uid}.json
+rm .locks/*.lock   # only if you're sure there are no active sessions
 ```
 
-### Dipendenze
+### Dependencies
 
-- `jq` (consigliato): `brew install jq` su macOS. Nativo su `/usr/bin/jq` su macOS recenti.
-- Fallback `python3` interno: usato automaticamente se `jq` manca. Stesso comportamento, leggermente più lento.
+- `jq` (recommended): `brew install jq` on macOS. Native at `/usr/bin/jq` on recent macOS.
+- Internal `python3` fallback: used automatically if `jq` is missing. Same behavior, slightly slower.
 
-Dettagli completi: vedi i quattro command file in `.claude/commands/` e lo script in `.claude/scripts/lock.sh`.
+Full details: see the four command files in `.claude/commands/` and the script in `.claude/scripts/lock.sh`.
 
 ---
 
 ## Multi-branch + Merge design-log
 
-Quando si lavora su branch separati (es. `release-2.x`, `feature/login`), i file condivisi del design-log generano conflitti merge rumorosi se mergeati con `git merge` standard. Il comando `/merge-design-log` orchestra un flusso che evita questo problema.
+When working on separate branches (e.g. `release-2.x`, `feature/login`), the shared design-log files produce noisy merge conflicts if merged with a standard `git merge`. The `/merge-design-log` command orchestrates a flow that avoids this problem.
 
-### Categorie di file
+### File categories
 
-| Categoria | File | Strategia |
-|-----------|------|-----------|
-| Sezionati (sync auto) | `PROGRESS.md`, `LEARNED.md`, `issues/_INDEX.md` | Pre-merge isolation → sync-from-branch automatico |
-| Narrativi (warning manuale) | `BEHAVIORS.md`, `PROJECT.md`, `METHODOLOGY.md` | Pre-merge isolation SE modificati → segnalazione, merge manuale |
-| Naturalmente non collidenti | `sessions/*.md`, `YYYY-MM-DD-*.md` | Nessun trattamento (timestamp/slug unici) |
+| Category | Files | Strategy |
+|----------|-------|----------|
+| Sectioned (auto sync) | `PROGRESS.md`, `LEARNED.md`, `issues/_INDEX.md` | Pre-merge isolation → automatic sync-from-branch |
+| Narrative (manual warning) | `BEHAVIORS.md`, `PROJECT.md`, `METHODOLOGY.md` | Pre-merge isolation IF modified → flag, manual merge |
+| Naturally non-colliding | `sessions/*.md`, `YYYY-MM-DD-*.md` | No treatment (unique timestamps/slugs) |
 
-### Flusso del comando `/merge-design-log <source> [--into <target>]`
+### Flow of the `/merge-design-log <source> [--into <target>]` command
 
-1. **Preflight**: working tree pulito, branch esistenti, memorizza `pre-isolate-sha` del source
-2. **Detect**: file da isolare (sempre + conditional via `git diff --name-only target...source -- design-log/`)
-3. **Isolation** (sul source): `git mv` dei file in `design-log/branches/<source>/`, commit "isolate"
-4. **Merge** (sul target): `git merge <source>`. Se conflitti reali su file applicativi → STOP + istruzioni `--resume`
-5. **Sync-from-branch** (sul target):
-   - PROGRESS.md: insert entry DONE per data, append TODO mancanti per titolo
-   - LEARNED.md: append righe nuove con marker `<!-- merged from branch <source> on YYYY-MM-DD -->`
-   - issues/_INDEX.md: rebuild totale da `design-log/issues/*.md`
-   - Per BEHAVIORS/PROJECT/METHODOLOGY: WARNING + merge manuale dall'archivio
+1. **Preflight**: clean working tree, existing branches, store the source's `pre-isolate-sha`
+2. **Detect**: files to isolate (always + conditional via `git diff --name-only target...source -- design-log/`)
+3. **Isolation** (on the source): move the files into `design-log/branches/<source>/`, commit "isolate"
+4. **Merge** (on the target): `git merge <source>`. If there are real conflicts on application files → STOP + `--resume` instructions
+5. **Sync-from-branch** (on the target):
+   - PROGRESS.md: insert DONE entries by date, append missing TODOs by title
+   - LEARNED.md: append new lines with a `<!-- merged from branch <source> on YYYY-MM-DD -->` marker
+   - issues/_INDEX.md: full rebuild from `design-log/issues/*.md`
+   - For BEHAVIORS/PROJECT/METHODOLOGY: WARNING + manual merge from the archive
    - Commit "sync design-log entries from branch <source>"
-6. **Reset del source** (con conferma esplicita): `git reset --hard <pre-isolate-sha>` → source torna ex-ante (history pulita). AVVISO: serve `git push --force` se il branch era pushato.
-7. **Ritorno al target**.
+6. **Source reset** (with explicit confirmation): `git reset --hard <pre-isolate-sha>` → source returns ex-ante (clean history). WARNING: `git push --force` is needed if the branch was pushed.
+7. **Return to the target**.
 
-### Risultato
+### Result
 
-- **Source branch**: ex-ante, file ai path originali, nessun commit di plumbing nella history. Resta vivo per altri bugfix fino al rilascio.
-- **Target branch**: storia esplicita del merge (commit "isolate" nel merge + commit "sync") + cartella `design-log/branches/<source>/` come archivio permanente.
-- Collisione: se `branches/<source>/` esiste già → suffisso timestamp `branches/<source>-YYYY-MM-DD-HH-MM/`.
+- **Source branch**: ex-ante, files at their original paths, no plumbing commit in the history. Stays alive for other bugfixes until the release.
+- **Target branch**: explicit merge history (the "isolate" commit in the merge + the "sync" commit) + the `design-log/branches/<source>/` folder as a permanent archive.
+- Collision: if `branches/<source>/` already exists → timestamp suffix `branches/<source>-YYYY-MM-DD-HH-MM/`.
 
-### Modalità `--resume`
+### `--resume` mode
 
-Dopo conflitti reali su file applicativi a STEP 4: l'utente risolve manualmente, fa `git add` + `git commit`, e lancia `/merge-design-log --resume <source>`. Il comando salta isolation/merge e riparte dal sync.
+After real conflicts on application files at STEP 4: the user resolves them manually, does `git add` + `git commit`, and runs `/merge-design-log --resume <source>`. The command skips isolation/merge and restarts from the sync.
 
-Dettagli completi: `.claude/commands/merge-design-log.md`.
+Full details: `.claude/commands/merge-design-log.md`.
 
 ---
 
-## Coordinazione cross-progetto (`.plan/`)
+## Cross-project coordination (`.plan/`)
 
-Quando un'iniziativa attraversa più progetti (sub) distinti che usano il design-log system, `/startcoord` permette di formalizzare il piano DAG cross-progetto e renderlo visibile a ogni `/startsession` nei sub coinvolti.
+When an initiative spans multiple distinct projects (subs) that use the design-log system, `/startcoord` lets you formalize the cross-project DAG plan and make it visible to every `/startsession` in the involved subs.
 
-### Modello
+### Model
 
-- L'utente lancia `/startcoord` da una **sessione attiva in un sub qualunque** (l'originator). Niente padre orchestrator pre-dedicato.
-- Claude usa il contesto della sessione corrente per fare proposte intelligenti durante il Q&A interactive.
-- Il comando scrive `.plan/<plan_id>.json` in tutti i `sub_path` coinvolti.
-- Tutte le copie sono inizialmente identiche e post-creazione sono **pari**: nessuna è "master".
-- Lavoro post-creazione: l'utente è libero (sequenziale chiudendo/aprendo sessioni nei sub, parallelo aprendo più sessioni Claude in sub diversi, mix).
+- The user runs `/startcoord` from an **active session in any sub** (the originator). No pre-dedicated parent orchestrator.
+- Claude uses the current session's context to make smart proposals during the interactive Q&A.
+- The command writes `.plan/<plan_id>.json` in all the involved `sub_path`s.
+- All the copies are initially identical and post-creation are **peers**: none is "master".
+- Post-creation work: the user is free (sequential by closing/opening sessions in the subs, parallel by opening multiple Claude sessions in different subs, mixed).
 
-### Cartella `.plan/`
+### The `.plan/` folder
 
-Ogni sub che usa il sistema ha la cartella `.plan/` (analoga a `.locks/`):
-- Vuota → nessun plan attivo (zero overhead in `/startsession`)
-- Con file `*.json` → plan attivi (carica e classifica)
-- Con `archived/` → plan completati (ignorati da `/startsession`)
+Every sub that uses the system has a `.plan/` folder (analogous to `.locks/`):
+- Empty → no active plan (zero overhead in `/startsession`)
+- With `*.json` files → active plans (load and classify)
+- With `archived/` → completed plans (ignored by `/startsession`)
 
-`.plan/` è creata best-effort da `/startsession`. Il contenuto è committato (default).
+`.plan/` is created best-effort by `/startsession`. The content is committed (default).
 
-### Inbox handoff (`.plan/inbox/`) — convenzione 2026-06-07
+### Handoff inbox (`.plan/inbox/`) — 2026-06-07 convention
 
-Le note di **handoff cross-progetto** (un sub che scrive a un altro: "ecco cosa devi fare", requisiti, sblocchi) vivono in **`.plan/inbox/`** del sub **destinatario**, NON in `design-log/` (dov'erano difficili da trovare). Posto unico e prevedibile, accanto ai `.plan/*.json` del coord.
+The **cross-project handoff** notes (one sub writing to another: "here is what you need to do", requirements, unblocks) live in **`.plan/inbox/`** of the **recipient** sub, NOT in `design-log/` (where they were hard to find). A single predictable place, next to the coord's `.plan/*.json`.
 
-- **Dove**: `<sub-destinatario>/.plan/inbox/`.
-- **Naming**: un file `.md` per nota, `YYYY-MM-DD-da-<sub-origine>.md` (es. `2026-06-07-da-ocrscore.md`).
-- **Chi scrive**: chiunque mandi un handoff (manualmente, o `/startcoord` / `/stopcoord` quando lasciano istruzioni a un sub) lo mette nell'inbox del destinatario.
-- **Chi legge**: `/startsession` (STEP 3.5f) elenca `.plan/inbox/*.md` e segnala le note nel riepilogo. Le note consumate si spostano in `.plan/inbox/archived/` per non risegnalarle.
-- **Git**: committato con `.plan/` (default).
+- **Where**: `<recipient-sub>/.plan/inbox/`.
+- **Naming**: one `.md` file per note, `YYYY-MM-DD-from-<origin-sub>.md` (e.g. `2026-06-07-from-ocrscore.md`).
+- **Who writes**: whoever sends a handoff (manually, or `/startcoord` / `/stopcoord` when they leave instructions for a sub) puts it in the recipient's inbox.
+- **Who reads**: `/startsession` (STEP 3.5f) lists `.plan/inbox/*.md` and flags the notes in the summary. Consumed notes are moved to `.plan/inbox/archived/` so they are not re-flagged.
+- **Git**: committed with `.plan/` (default).
 
-### Schema del plan
+### Plan schema
 
 ```json
 {
@@ -646,7 +646,7 @@ Le note di **handoff cross-progetto** (un sub che scrive a un altro: "ecco cosa 
   "created_at": "ISO 8601 UTC",
   "originator_host": "...",
   "originator_uid": "...",
-  "originator_sub_path": "/abs/path/to/sub-dove-e-stato-creato",
+  "originator_sub_path": "/abs/path/to/sub-where-it-was-created",
   "tasks": [
     {
       "id": "core-1",
@@ -662,187 +662,187 @@ Le note di **handoff cross-progetto** (un sub che scrive a un altro: "ecco cosa 
 }
 ```
 
-### Auto-detection del completamento
+### Auto-detection of completion
 
-Il completamento di un task NON richiede comandi manuali. La transizione `pending → in_progress → completed` è dedotta da `/startsession` leggendo il design log artifact:
-- Artifact non esiste → task pending
-- Artifact esiste con `Status: Draft` o `Implementing` → in_progress
-- Artifact con `Status: Implemented` → completed
+Task completion does NOT require manual commands. The `pending → in_progress → completed` transition is deduced by `/startsession` reading the design log artifact:
+- Artifact doesn't exist → task pending
+- Artifact exists with `Status: Draft` or `Implementing` → in_progress
+- Artifact with `Status: Implemented` → completed
 
-Le copie del JSON nei sub sono cache opportunistiche aggiornate dalle sessioni che le toccano. La fonte di verità è sempre il design log artifact.
+The copies of the JSON in the subs are opportunistic caches updated by the sessions that touch them. The source of truth is always the design log artifact.
 
-### Verifica delle dipendenze
+### Dependency verification
 
-Quando `/startsession` valuta un task pending del sub corrente, per ogni `dep_id` in `depends_on` legge l'artifact dichiarato nel `sub_path` del dependency (filesystem cross-sub), e cerca `Status: Implemented`. Se TUTTE le dipendenze sono soddisfatte → task pronto. Altrimenti → task bloccato (mostra quali dep sono ancora pending).
+When `/startsession` evaluates a pending task of the current sub, for each `dep_id` in `depends_on` it reads the artifact declared in the dependency's `sub_path` (cross-sub filesystem), and looks for `Status: Implemented`. If ALL dependencies are satisfied → task ready. Otherwise → task blocked (shows which deps are still pending).
 
 ### Auto-archive
 
-Quando TUTTI i task di un plan risultano `completed` (tutti gli artifact `Implemented`), `/startsession` sposta `.plan/<plan_id>.json` in `.plan/archived/<plan_id>.json` (best-effort su tutti i sub raggiungibili).
+When ALL the tasks of a plan are `completed` (all artifacts `Implemented`), `/startsession` moves `.plan/<plan_id>.json` to `.plan/archived/<plan_id>.json` (best-effort across all reachable subs).
 
-### Vincoli
+### Constraints
 
-- Tutti i `sub_path` devono essere accessibili via filesystem locale dal sub che esegue `/startsession`.
-- Setup distribuiti (sub su macchine diverse) NON supportati in F2 minimale.
+- All the `sub_path`s must be accessible via the local filesystem from the sub that runs `/startsession`.
+- Distributed setups (subs on different machines) are NOT supported in the minimal version.
 
-Dettagli completi: `.claude/commands/startcoord.md`.
-
----
-
-## Workflow Completo
-
-### Ricevendo un Task
-
-0. **CATTURA PRIMA (R.15)**: qualsiasi cosa l'utente chieda — anche minima — va **scritta prima di agire**. Se è "segna" o un'idea grezza → `INBOX.md`. Se è pianificazione già chiara → `TODO.md`. Mai tenerla solo "a mente".
-
-1. Il task è in `TODO.md` (o appena triagato da `INBOX.md`)?
-   - Sì: verifica se esiste design log
-   - No: aggiungilo alla priorità appropriata
-
-2. Serve un design log?
-   - Cambio piccolo (< 3 file): procedi direttamente
-   - Cambio significativo: crea design log PRIMA
-
-   Quando inizi davvero a lavorarci, **portalo in `FOCUS.md`** (`🔄 in corso`) — una sola voce in corso per volta (R.17).
-
-3. Per design logs:
-   - Crea draft con Background, Problem, Questions
-   - FAI domande (Socratic method)
-   - Aspetta risposte utente
-   - Completa Design
-   - Ottieni approvazione
-   - POI implementa
-
-### Dopo Ogni Task
-
-1. File di tracking (split per-tipo — SEMPRE attivo). **Distingui implementato da validato (R.16):**
-   - **Implementato ma non ancora validato** (build verde, l'utente non l'ha visto) → la voce va in `TO_TEST.md` e resta in `FOCUS.md` con stato `🧪 da validare`. **NON** in DONE.
-   - **Validato** (l'utente l'ha visto funzionare) → SOLO ora muovi in `DONE.md` (entry ricca What/How/Files/Notes); se era un bug → `FIXED.md`. **Rimuovi la voce** da `TODO.md`/`TO_FIX.md`/`TO_TEST.md` e da `FOCUS.md`.
-   - **Archiviazione**: se `DONE.md` o `FIXED.md` supera ~400 righe, sposta le entry più vecchie in `progress.old.md`
-   - Aggiorna `FOCUS.md` (la voce chiusa esce; se libera, promuovi la prossima `⏸️` a `🔄`)
-   - Aggiorna `PROGRESS.md` (solo indice: contatori + link, niente entry-log)
-   - Aggiorna timestamp
-
-2. Design log (se esiste):
-   - Spunta item completati in Implementation Plan
-   - Aggiungi note in Implementation Results
-   - Aggiorna Status
-
-3. Session log (se necessario):
-   - Sessione lunga (15+ scambi)?
-   - Milestone importante completata?
-   - Stai per cambiare contesto?
+Full details: `.claude/commands/startcoord.md`.
 
 ---
 
-## Pattern Locale/Globale — File fondamentali, locali e globali
+## Complete Workflow
 
-> Introdotto 2026-05-07. Vedi design log `2026-05-07-local-global-pattern.md`.
+### Receiving a Task
 
-Il sistema distingue sei "tipi" di file di personalizzazione, organizzati su tre piani: **fondamentali del metodo** (sovrascritti agli update), **locali al progetto** (persistono cross-update), **globali cross-progetto** (vivono fuori dai repo).
+0. **CAPTURE FIRST (R.15)**: whatever the user asks — even the smallest thing — must be **written before acting**. If it is "note" or a raw idea → `INBOX.md`. If it is already clear planning → `TODO.md`. Never keep it only "in mind".
 
-### Tabella delle responsabilità
+1. Is the task in `TODO.md` (or just triaged from `INBOX.md`)?
+   - Yes: check whether a design log exists
+   - No: add it to the appropriate priority
 
-| File | Vita | Cosa contiene | Aggiornato da | Sovrascritto agli update? |
-|------|------|---------------|---------------|---------------------------|
-| `BEHAVIORS.md` | In ogni progetto, symlink al meta | SOLO regole comportamentali **generali** del metodo | Solo meta-progetto via release | **SÌ** |
-| `METHODOLOGY.md` | In ogni progetto, symlink al meta | SOLO metodologia **generale** del metodo | Solo meta-progetto via release | **SÌ** |
-| `BEHAVIORS_LOCAL.md` | In ogni progetto | Regole comportamentali **specifiche del progetto** (come Claude deve comportarsi qui) | `/savesession` (classifica locale) o utente | NO |
-| `PROJECT_UPDATES.md` | In ogni progetto | **Contesto/convenzioni/decisioni operative** specifici del progetto (workflow, naming, deploy, tensioni architetturali, scope modificato) | `/savesession` (classifica locale) o utente | NO |
-| `LEARNED.md` | In ogni progetto | Conoscenza tecnica **specifica del progetto** (incl. gotcha niche di-una-sola-API usati da un solo progetto) | `/savesession` (classifica locale) o utente | NO |
-| `~/.claude-method/LEARNED_GLOBAL/` (cartella) | Repo globale fuori dai progetti | **PRINCIPI universali** di come-si-lavora/costruisce (NON fatti specifici), **un file per dominio**; `/startsession` carica solo i domini pertinenti allo stack | `/savesession` (classifica globale) o utente | NO (vive fuori) |
+2. Do you need a design log?
+   - Small change (< 3 files): proceed directly
+   - Significant change: create a design log FIRST
 
-### Regola fondamentale: `/savesession` non scrive in BEHAVIORS/METHODOLOGY
+   When you actually start working on it, **bring it into `FOCUS.md`** (`🔄 in progress`) — only one item in progress at a time (R.17).
 
-Vedi BEHAVIORS Regola 14. Quando in una sessione emerge una nuova regola/lezione, `/savesession` la classifica e la instrada nel file giusto:
-- Regola **comportamentale locale al progetto** (su come Claude deve comportarsi) → `BEHAVIORS_LOCAL.md`
-- **Contesto/convenzione/decisione operativa** locale al progetto → `PROJECT_UPDATES.md`
-- Lezione **globale (un PRINCIPIO universale di come-si-lavora/costruisce)** → il file dominio giusto in `~/.claude-method/LEARNED_GLOBAL/` (vedi criterio PRINCIPIO-vs-FATTO sotto)
-- Lezione tecnica **locale al progetto** (ogni fatto/gotcha specifico di un tool/API/progetto) → `LEARNED.md`
+3. For design logs:
+   - Create a draft with Background, Problem, Questions
+   - ASK questions (Socratic method)
+   - Wait for the user's answers
+   - Complete the Design
+   - Get approval
+   - THEN implement
 
-L'auto-classificazione è proposta da Claude e confermata dall'utente. Default conservativo: locale. **Criterio PRINCIPIO vs FATTO**: nel globale va solo un *principio* universale di *come si lavora/costruisce*; ogni *fatto* specifico (tool/API/progetto) è locale — anche se "riusabile" (le memorie locali si recuperano cross-progetto). Il conteggio «≥2 progetti» è **fallace** e non si usa.
+### After Each Task
 
-### Esempi di classificazione
+1. Tracking files (split by type — ALWAYS active). **Tell implemented apart from validated (R.16):**
+   - **Implemented but not yet validated** (green build, the user hasn't seen it) → the item goes to `TO_TEST.md` and stays in `FOCUS.md` with the state `🧪 to validate`. **NOT** in DONE.
+   - **Validated** (the user has seen it work) → ONLY now move it to `DONE.md` (a rich What/How/Files/Notes entry); if it was a bug → `FIXED.md`. **Remove the item** from `TODO.md`/`TO_FIX.md`/`TO_TEST.md` and from `FOCUS.md`.
+   - **Archiving**: if `DONE.md` or `FIXED.md` exceeds ~400 lines, move the oldest entries to `progress.old.md`
+   - Update `FOCUS.md` (the closed item exits; if it frees up, promote the next `⏸️` to `🔄`)
+   - Update `PROGRESS.md` (index only: counters + links, no log entries)
+   - Update the timestamp
 
-| Esempio di regola/lezione | Dove va | Perché |
-|---------------------------|---------|--------|
-| "Questo è un sotto-progetto di X, parent in `../../`, non duplicare info" | `BEHAVIORS_LOCAL.md` / Regole Comportamentali | Regola comportamentale specifica del progetto |
-| "Quando parli di feature X, sempre verificare modulo Y" | `BEHAVIORS_LOCAL.md` / Regole Comportamentali | Regola comportamentale specifica del progetto |
-| "main = branch della prossima versione; release/X.Y = parcheggio" | `PROJECT_UPDATES.md` / Contesto/Convenzioni | Convenzione operativa del progetto |
-| "Tensione architetturale meta-vs-centralizzato — Modello 1 attuale, Modello 3 escape hatch" | `PROJECT_UPDATES.md` / Contesto/Convenzioni | Decisione operativa / contesto architetturale |
-| «se non funziona, non a caso: alza i log e traccia il flusso, atteso vs reale» | `LEARNED_GLOBAL/general.md` / Errori | **PRINCIPIO** universale di debugging, vero sempre |
-| «compila ≠ funziona: traccia i flussi prima di dire fatto» | `LEARNED_GLOBAL/software-general.md` / Soluzioni | **PRINCIPIO** di come-si-costruisce, indipendente dal tool |
-| «`git mv` non funziona per pre-merge isolation» | `LEARNED.md` locale del progetto | **FATTO** su un tool (git): specifico → locale, anche se "riusabile" (si recupera cross-progetto) |
-| «`AVAudioUnitSampler` ignora onChannel» | `LEARNED.md` locale di quell'app | **FATTO** su una singola API → locale |
-| «rendi le operazioni idempotenti per gestire la consegna doppia» (webhook) | `LEARNED_GLOBAL/software-web.md` / Soluzioni | **PRINCIPIO** di come-si-costruisce un webhook sicuro (il dettaglio del codice `23505` sta nella voce locale del progetto) |
-| «Knob rotanti scomodi per valori precisi → preferire slider» | `LEARNED_GLOBAL/design.md` / Pattern Tecnici | **PRINCIPIO** UX, vale a prescindere dal framework |
-| «Non committare settings.local.json» | `LEARNED_GLOBAL/preferenze.md` | Preferenza trasversale a TUTTI i progetti |
-| "L'utente preferisce tab a dropdown in questo progetto" | `PROJECT_UPDATES.md` / Contesto | UX di un progetto specifico → locale |
+2. Design log (if it exists):
+   - Check off completed items in the Implementation Plan
+   - Add notes in Implementation Results
+   - Update the Status
 
-### Repo globale `~/.claude-method/`
+3. Session log (if needed):
+   - Long session (15+ exchanges)?
+   - Important milestone completed?
+   - About to switch context?
 
-Repo dedicato **richiesto** dal metodo:
-- Path **hardcoded**: `~/.claude-method/`
-- `/startsession` di OGNI progetto verifica esistenza all'avvio. Se manca → **errore bloccante**, sessione interrotta finché il setup non è completo.
-- Setup multi-postazione via `git clone` (vedi README dentro il repo)
-- Contiene: `LEARNED_GLOBAL.md` (index/manifest) + cartella `LEARNED_GLOBAL/` (file per dominio) + `README.md`
+---
 
-**Struttura `LEARNED_GLOBAL/` (un file per dominio, dal 2026-06-05):**
+## Local/Global Pattern — Fundamental, local and global files
+
+> Introduced 2026-05-07. See design log `2026-05-07-local-global-pattern.md`.
+
+The system distinguishes six "types" of customization files, organized on three planes: **method fundamentals** (overwritten on updates), **project-local** (persist cross-update), **cross-project global** (live outside the repos).
+
+### Responsibility table
+
+| File | Life | What it holds | Updated by | Overwritten on updates? |
+|------|------|---------------|------------|-------------------------|
+| `BEHAVIORS.md` | In every project, symlink to the meta | ONLY the method's **general** behavioral rules | Only the meta-project via release | **YES** |
+| `METHODOLOGY.md` | In every project, symlink to the meta | ONLY the method's **general** methodology | Only the meta-project via release | **YES** |
+| `BEHAVIORS_LOCAL.md` | In every project | **Project-specific** behavioral rules (how Claude should behave here) | `/savesession` (classifies local) or the user | NO |
+| `PROJECT_UPDATES.md` | In every project | **Project-specific context/conventions/operational decisions** (workflow, naming, deploy, architectural tensions, changed scope) | `/savesession` (classifies local) or the user | NO |
+| `LEARNED.md` | In every project | **Project-specific** technical knowledge (incl. niche single-API gotchas used by a single project) | `/savesession` (classifies local) or the user | NO |
+| `~/.claude-method/LEARNED_GLOBAL/` (folder) | Global repo outside the projects | **Universal PRINCIPLES** of how-you-work/build (NOT specific facts), **one file per domain**; `/startsession` loads only the domains relevant to the stack | `/savesession` (classifies global) or the user | NO (lives outside) |
+
+### Fundamental rule: `/savesession` does not write to BEHAVIORS/METHODOLOGY
+
+See BEHAVIORS Rule 14. When a new rule/lesson emerges in a session, `/savesession` classifies it and routes it to the right file:
+- **Project-local behavioral rule** (about how Claude should behave) → `BEHAVIORS_LOCAL.md`
+- **Project-local context/convention/operational decision** → `PROJECT_UPDATES.md`
+- **Global lesson (a universal PRINCIPLE of how-you-work/build)** → the right domain file in `~/.claude-method/LEARNED_GLOBAL/` (see the PRINCIPLE-vs-FACT criterion below)
+- **Project-local technical lesson** (every specific fact/gotcha of a tool/API/project) → `LEARNED.md`
+
+The auto-classification is proposed by Claude and confirmed by the user. Conservative default: local. **PRINCIPLE vs FACT criterion**: only a universal *principle* of *how you work/build* goes global; every specific *fact* (tool/API/project) is local — even if "reusable" (local memories are recalled cross-project). The "≥2 projects" count is **fallacious** and not used.
+
+### Classification examples
+
+| Example rule/lesson | Where it goes | Why |
+|---------------------|---------------|-----|
+| "This is a sub-project of X, parent in `../../`, don't duplicate info" | `BEHAVIORS_LOCAL.md` / Behavioral Rules | Project-specific behavioral rule |
+| "When talking about feature X, always check module Y" | `BEHAVIORS_LOCAL.md` / Behavioral Rules | Project-specific behavioral rule |
+| "main = next version's branch; release/X.Y = parking" | `PROJECT_UPDATES.md` / Context/Conventions | Project operational convention |
+| "Architectural tension meta-vs-centralized — Model 1 current, Model 3 escape hatch" | `PROJECT_UPDATES.md` / Context/Conventions | Operational decision / architectural context |
+| "if it doesn't work, don't guess: turn the logs up and trace the flow, expected vs actual" | `LEARNED_GLOBAL/general.md` / Mistakes | **PRINCIPLE**, a universal debugging one, always true |
+| "it compiles ≠ it works: trace the flows before saying done" | `LEARNED_GLOBAL/software-general.md` / Solutions | **PRINCIPLE** of how-you-build, tool-independent |
+| "`git mv` doesn't work for pre-merge isolation" | project-local `LEARNED.md` | **FACT** about a tool (git): specific → local, even if "reusable" (recalled cross-project) |
+| "`AVAudioUnitSampler` ignores onChannel" | that app's local `LEARNED.md` | **FACT** about a single API → local |
+| "make operations idempotent to handle double delivery" (webhook) | `LEARNED_GLOBAL/software-web.md` / Solutions | **PRINCIPLE** of how-you-build a safe webhook (the detail of code `23505` stays in the project's local entry) |
+| "Rotary knobs awkward for precise values → prefer sliders" | `LEARNED_GLOBAL/design.md` / Technical Patterns | **PRINCIPLE**, a UX one, holds regardless of the framework |
+| "Don't commit settings.local.json" | `LEARNED_GLOBAL/preferences.md` | Preference across ALL projects |
+| "The user prefers tabs to dropdowns in this project" | `PROJECT_UPDATES.md` / Context | UX of a specific project → local |
+
+### Global repo `~/.claude-method/`
+
+A dedicated repo **required** by the method:
+- **Hardcoded** path: `~/.claude-method/`
+- Every project's `/startsession` checks its existence at startup. If missing → **blocking error**, session interrupted until the setup is complete.
+- Multi-workstation setup via `git clone` (see the README inside the repo)
+- Contains: `LEARNED_GLOBAL.md` (index/manifest) + the `LEARNED_GLOBAL/` folder (a file per domain) + `README.md`
+
+**`LEARNED_GLOBAL/` structure (a file per domain, since 2026-06-05):**
 ```
-LEARNED_GLOBAL.md          ← index: spiega split, criterio, cosa caricare quando (SEMPRE letto)
+LEARNED_GLOBAL.md          ← index: explains the split, the criterion, what to load when (ALWAYS read)
 LEARNED_GLOBAL/
-├── general.md             ← SEMPRE caricato (cross-domain: metodo, workflow, agenti)
-├── preferenze.md          ← SEMPRE caricato (preferenze utente trasversali)
-├── software-general.md    ← condizionale (git/bash/tooling/architettura/ML/ffmpeg)
-├── software-apple.md      ← condizionale (Swift/iOS/macOS/Catalyst/AVFoundation/Xcode)
-├── software-web.md        ← condizionale (web/backend/DB/auth/SaaS/cloud)
-└── design.md              ← condizionale (UX/visivo/controlli)
+├── general.md             ← ALWAYS loaded (cross-domain: method, workflow, agents)
+├── preferences.md         ← ALWAYS loaded (cross-cutting user preferences)
+├── software-general.md    ← conditional (git/bash/tooling/architecture/ML/ffmpeg)
+├── software-apple.md      ← conditional (Swift/iOS/macOS/Catalyst/AVFoundation/Xcode)
+├── software-web.md        ← conditional (web/backend/DB/auth/SaaS/cloud)
+└── design.md              ← conditional (UX/visual/controls)
 ```
-Ogni file dominio contiene `### Pattern Tecnici`, `### Errori da Non Ripetere`, `### Soluzioni Riutilizzabili`.
+Each domain file contains `### Technical Patterns`, `### Mistakes Not to Repeat`, `### Reusable Solutions`.
 
-**Caricamento per stack**: `/startsession` legge SEMPRE l'index + `general` + `preferenze`, e SOLO i domini condizionali pertinenti allo stack dichiarato in `PROJECT.md` (mapping nell'index). Obiettivo: un progetto web non legge le regole Apple e viceversa. `software-general` NON è sempre-caricato — un progetto può non essere software affatto; si carica solo se contiene codice/scripting/build. La mappa completa stack→domini vive nell'index `LEARNED_GLOBAL.md`.
+**Loading by stack**: `/startsession` ALWAYS reads the index + `general` + `preferences`, and ONLY the conditional domains relevant to the stack declared in `PROJECT.md` (mapping in the index). Goal: a web project doesn't read the Apple rules and vice versa. `software-general` is NOT always-loaded — a project may not be software at all; it is loaded only if it contains code/scripting/build. The full stack→domains map lives in the index `LEARNED_GLOBAL.md`.
 
-### Cosa NON modificare manualmente
+### What NOT to modify manually
 
-- `BEHAVIORS.md` e `METHODOLOGY.md` di un progetto: sono symlink al meta-progetto, sovrascritti agli update. Edit manuale non sopravvive al prossimo update.
-- Per cambiare il metodo: lavora sul meta-progetto (Claude Persistent Memory System) o su StartingKit, fai release, propaga.
-- Per cambiare comportamenti del singolo progetto: usa `BEHAVIORS_LOCAL.md` (regole) o `PROJECT_UPDATES.md` (contesto/convenzioni).
-
----
-
-## LEARNED.md (locale) vs LEARNED_GLOBAL/ — Cosa scrivere e dove
-
-La distinzione è **PRINCIPIO vs FATTO**: una lezione va in `~/.claude-method/LEARNED_GLOBAL/` **solo se è un PRINCIPIO universale** di *come si lavora / come si costruisce* (vero sempre per natura, indipendente dal tool/progetto). Ogni **fatto/gotcha specifico** (una singola API/tool/libreria/progetto) resta **locale** — anche se "tecnicamente generale / riusabile": le memorie locali si **recuperano** cross-progetto quando servono. Il conteggio «≥2 progetti» è **fallace** e abbandonato (2026-07-30). Tutto il resto resta locale (o non si scrive).
-
-### ✅ VA in LEARNED locale del progetto
-- Pattern specifici del codebase del progetto (es. "il modulo X usa pattern Y per Z")
-- **Ogni FATTO/gotcha specifico** di un tool/API/libreria/progetto — **anche se "tecnicamente generale / riusabile"** (es. "`AVAudioUnitSampler` si comporta così"; "`hooks/hooks.json` di un plugin si auto-carica"; "`git mv` rompe la pre-merge isolation"). Un *fatto* specifico è locale: si **recupera** cross-progetto quando serve, non serve globalizzarlo.
-- Convenzioni di test e configurazioni hardcoded del progetto
-
-### ✅ VA in LEARNED_GLOBAL/<dominio> (SOLO principi universali di come-si-lavora/costruisce)
-- **Principi di metodo/debugging/verifica** veri sempre (es. «alza i log e traccia il flusso, atteso vs reale»; «compila ≠ funziona»; «verifica, non assumere») → `general.md` / `software-general.md`
-- **Principi di come-si-costruisce** indipendenti dal tool (es. «rendi le operazioni idempotenti per gestire la consegna doppia»; «design PRIMA di codice per protocolli complessi») → dominio pertinente
-- **Principi UX/di prodotto** cross-framework (es. «knob scomodi per valori precisi → slider») → `design.md`
-- Si classifica per **tipo di conoscenza** (dominio), non per progetto di origine
-
-### ❌ NON VA in LEARNED (né in LEARNED_GLOBAL)
-- Regole/decisioni di business o di prodotto ("preset Advanced ha priorità", "bordone slider appare solo se attivo")
-- Comportamento specifico di una feature, valori hardcoded del progetto
-- Preferenze utente/UX di UN progetto ("l'utente vuole tab qui") → `PROJECT_UPDATES.md`
-- Regole comportamentali per Claude → `BEHAVIORS_LOCAL.md` (se locali) o BEHAVIORS.md (solo metodo, via meta)
-- Voci a bassissimo riuso (1 incidente irripetibile) → cestino, non si scrivono
-
-**Test rapido (PRINCIPIO vs FATTO):**
-- "È un **PRINCIPIO di come-si-lavora/costruisce**, vero sempre e indipendente dal tool — o un **FATTO** su un tool/API/progetto specifico?" Principio → `LEARNED_GLOBAL/<dominio>`. Fatto specifico → `LEARNED.md` locale (anche se "riusabile"). Riuso quasi-nullo → cestino.
-- "Questa è una regola di comportamento per Claude?" Locale → `BEHAVIORS_LOCAL.md`. Generale (metodo) → solo via meta-progetto.
-- In quale **dominio**? Apple/Swift → `software-apple.md`; web/backend → `software-web.md`; git/bash/tooling/architettura → `software-general.md`; UX/visivo → `design.md`; metodo/workflow → `general.md`; preferenza trasversale → `preferenze.md`.
+- A project's `BEHAVIORS.md` and `METHODOLOGY.md`: they are symlinks to the meta-project, overwritten on updates. A manual edit does not survive the next update.
+- To change the method: work on the meta-project (Claude Persistent Memory System) or on StartingKit, make a release, propagate.
+- To change a single project's behaviors: use `BEHAVIORS_LOCAL.md` (rules) or `PROJECT_UPDATES.md` (context/conventions).
 
 ---
 
-## Il Principio Fondamentale
+## LEARNED.md (local) vs LEARNED_GLOBAL/ — What to write and where
 
-**"Non fidarti di Claude. Verifica."**
+The distinction is **PRINCIPLE vs FACT**: a lesson goes to `~/.claude-method/LEARNED_GLOBAL/` **only if it is a universal PRINCIPLE** of *how you work / how you build* (always true by nature, independent of the tool/project). Every **specific fact/gotcha** (a single API/tool/library/project) stays **local** — even if "technically general / reusable": local memories are **recalled** cross-project when needed. The "≥2 projects" count is **fallacious** and abandoned (2026-07-30). Everything else stays local (or is not written).
 
-Ogni comando ha:
-1. **Step OBBLIGATORI** - ORDINI, non suggerimenti
-2. **Output VISIBILE** - checklist che l'utente vede
-3. **Checkpoint** - punti dove Claude si FERMA e aspetta
+### ✅ GOES in the project's local LEARNED
+- Patterns specific to the project's codebase (e.g. "module X uses pattern Y for Z")
+- **Every specific FACT/gotcha** of a tool/API/library/project — **even if "technically general / reusable"** (e.g. "`AVAudioUnitSampler` behaves like this"; "a plugin's `hooks/hooks.json` auto-loads"; "`git mv` breaks the pre-merge isolation"). A specific *fact* is local: it is **recalled** cross-project when needed, no need to globalize it.
+- Test conventions and hardcoded project configs
+
+### ✅ GOES in LEARNED_GLOBAL/<domain> (ONLY universal principles of how-you-work/build)
+- **Method/debugging/verification principles** that are always true (e.g. "turn the logs up and trace the flow, expected vs actual"; "it compiles ≠ it works"; "verify, don't assume") → `general.md` / `software-general.md`
+- **How-you-build principles** independent of the tool (e.g. "make operations idempotent to handle double delivery"; "design BEFORE code for complex protocols") → the relevant domain
+- **UX/product principles** that are cross-framework (e.g. "knobs awkward for precise values → slider") → `design.md`
+- Classified by **kind of knowledge** (domain), not by project of origin
+
+### ❌ Does NOT go in LEARNED (nor in LEARNED_GLOBAL)
+- Business or product rules/decisions ("the Advanced preset has priority", "the slider drone appears only if active")
+- Feature-specific behavior, hardcoded project values
+- Single-project user/UX preferences ("the user wants tabs here") → `PROJECT_UPDATES.md`
+- Behavioral rules for Claude → `BEHAVIORS_LOCAL.md` (if local) or BEHAVIORS.md (method only, via the meta)
+- Very-low-reuse items (a one-off incident) → trash, not written
+
+**Quick test (PRINCIPLE vs FACT):**
+- "Is it a **PRINCIPLE of how-you-work/build**, always true and tool-independent — or a **FACT** about a specific tool/API/project?" Principle → `LEARNED_GLOBAL/<domain>`. Specific fact → local `LEARNED.md` (even if "reusable"). Near-zero reuse → trash.
+- "Is this a behavioral rule for Claude?" Local → `BEHAVIORS_LOCAL.md`. General (method) → only via the meta-project.
+- Which **domain**? Apple/Swift → `software-apple.md`; web/backend → `software-web.md`; git/bash/tooling/architecture → `software-general.md`; UX/visual → `design.md`; method/workflow → `general.md`; cross-cutting preference → `preferences.md`.
+
+---
+
+## The Fundamental Principle
+
+**"Don't trust Claude. Verify."**
+
+Every command has:
+1. **MANDATORY steps** - ORDERS, not suggestions
+2. **VISIBLE output** - a checklist the user sees
+3. **Checkpoints** - points where Claude STOPS and waits
