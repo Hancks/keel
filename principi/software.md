@@ -1,7 +1,7 @@
-## 🛠️ Principi — Tier 2a: progetti SOFTWARE
+## 🛠️ Principles — Tier 2a: SOFTWARE projects
 
-- **Debugging sistematico (non a tentoni).** Se qualcosa non funziona: alza al MAX i log → disegna test → disegna scenari → esegui → verifica il flusso leggendo i log → analizza le differenze tra atteso e reale. Niente trial-and-error cieco.
-- **Sviluppo con verifica degli obiettivi.** Ogni implementazione è accoppiata a una verifica che controlla che faccia davvero ciò che serve — non solo che "compili". «Compila ≠ funziona»: traccia i flussi.
-- **Pianificazione test (light).** Prima/insieme all'implementazione, definisci i pochi test che dimostrano il comportamento. Versione leggera del test-driven: pochi test che contano, non copertura totale.
-- **Validazione dei modelli e con test.** Dati/modelli si validano su input **reali rappresentativi**; le fixture d'integrazione si **catturano dal servizio reale**, non si scrivono dall'assunzione del codice (un test che si dà ragione da solo non prova nulla).
-- **Confutazione delle assunzioni in progettazione.** Ogni design significativo passa da un confutatore che prova a **smontarne le assunzioni** prima di implementare (è qui che nascono i loop-bug: prevenirli a monte).
+- **Systematic debugging (not by trial and error).** If something doesn't work: turn the logs up to the MAX → design tests → design scenarios → run → verify the flow by reading the logs → analyze the differences between expected and actual. No blind trial-and-error.
+- **Development with goal verification.** Every implementation is paired with a verification that checks it really does what's needed — not just that it "compiles". "It compiles ≠ it works": trace the flows.
+- **Test planning (light).** Before/alongside the implementation, define the few tests that prove the behavior. A light version of test-driven: a few tests that matter, not total coverage.
+- **Model and test validation.** Data/models are validated on **real representative** input; integration fixtures are **captured from the real service**, not written from the code's assumption (a test that proves itself right proves nothing).
+- **Refutation of assumptions at design time.** Every significant design goes through a refuter that tries to **dismantle its assumptions** before implementing (this is where loop-bugs are born: prevent them upstream).

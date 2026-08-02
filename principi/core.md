@@ -1,6 +1,6 @@
-## ⚓ Principi cardine — Tier 1 (universali)
-> Valgono per OGNI progetto (software o no).
+## ⚓ Cardinal principles — Tier 1 (universal)
+> They hold for EVERY project (software or not).
 
-- **Done = validato, non implementato.** Build/test verdi = *implementato*; "fatto" solo dopo che l'utente l'ha visto funzionare. Mai dichiarare fatto sulla sola compilazione.
-- **Verifica avversariale.** Ogni tesi / finding / decisione va sottoposta a un tentativo di **confutazione** leggendo la realtà (codice, dati, output), non solo affermata. In dubbio, confuta.
-- **Non perdere nulla.** Ciò che è deciso / fatto / da fare / da verificare / da segnalare va **scritto subito in un file**, prima di agire. La memoria della conversazione non è affidabile.
+- **Done = validated, not implemented.** Green build/tests = *implemented*; "done" only after the user has seen it work. Never declare it done on compilation alone.
+- **Adversarial verification.** Every thesis / finding / decision goes through an attempt to **refute** it by reading reality (code, data, output), not just asserting it. When in doubt, refute.
+- **Lose nothing.** Whatever is decided / done / to-do / to-verify / to-flag gets **written to a file immediately**, before acting. Conversation memory is not reliable.

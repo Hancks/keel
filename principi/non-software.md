@@ -1,8 +1,8 @@
-## 📗 Principi — Tier 2b: progetti NON software  (STUB)
-> Caricati quando il progetto NON è di sviluppo software (ricerca, scrittura, design, ecc.).
+## 📗 Principles — Tier 2b: NON-software projects  (STUB)
+> Loaded when the project is NOT software development (research, writing, design, etc.).
 >
-> **TODO (da definire in un passaggio dedicato).** Il metodo è nato e testato al ~90% su progetti software;
-> qui vanno le regole di metodo *equivalenti* per progetti non-software (es. verifica delle fonti al posto
-> del debugging, validazione con revisori/lettori al posto dei test, ecc.).
+> **TODO (to be defined in a dedicated pass).** The method was born and tested ~90% on software projects;
+> here go the *equivalent* method rules for non-software projects (e.g. source verification instead of
+> debugging, validation with reviewers/readers instead of tests, etc.).
 
-- *(placeholder — da riempire)*
+- *(placeholder — to be filled in)*
