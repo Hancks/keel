@@ -87,7 +87,8 @@ Restituisce JSON `{markers: [...], file_locks: [...]}`. Schema di ogni marker:
 **Caso A — Nessun marker presente:**
 Crea il proprio marker `exclusive`:
 ```bash
-UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init)
+# SESSION_UID, non UID: in zsh UID è read-only → `UID=$(...)` crasha (bad math expr) e non cattura
+SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init); echo "$SESSION_UID"
 ```
 
 OUTPUT:
@@ -113,7 +114,8 @@ serve esplicito /startsharedsession).
 ```
 Poi crea il marker come nel Caso A:
 ```bash
-UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init)
+# SESSION_UID, non UID: in zsh UID è read-only → `UID=$(...)` crasha (bad math expr) e non cattura
+SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init); echo "$SESSION_UID"
 ```
 
 **Caso C — Almeno un marker `exclusive` (oltre a eventuali shared):**
