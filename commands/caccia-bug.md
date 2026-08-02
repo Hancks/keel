@@ -1,10 +1,10 @@
 ---
-description: Caccia-bug esplicita "light" — finder per lente (Opus) + confutatore/validatore per finding (Haiku), motore Workflow, report triagato per impatto. On-demand.
+description: Caccia-bug esplicita "light" — finder per lente (Opus) + confutatore/validatore per finding (Fable), motore Workflow, report triagato per impatto. On-demand.
 ---
 
 # /caccia-bug — caccia-bug light (Design-Log v2 · Fase 2b)
 
-Cerchi ciò che è **già rotto e visibile** nel codice, on-demand, con le lenti che scegli. Motore: pochi **finder forti** (Opus, uno per lente) + tanti **confutatori/validatori economici** (Haiku 4.5, uno per segnalazione). Output: un **report triagato per impatto** su file + triage **voce-per-voce**.
+Cerchi ciò che è **già rotto e visibile** nel codice, on-demand, con le lenti che scegli. Motore: pochi **finder forti** (Opus, uno per lente) + tanti **confutatori/validatori economici** (Fable 5, uno per segnalazione). Output: un **report triagato per impatto** su file + triage **voce-per-voce**.
 
 > ⚠️ Limite onesto (dillo nel report): questa caccia trova solo bug con un **sintomo leggibile ora**. La classe «scelta corretta oggi che arma una trappola domani» (nessun sintomo attuale) le è **cieca** — quella vive nella **confutazione-in-progettazione** (skill `adversarial-review`), non qui. Un report pulito **non** dimostra che il codice è pulito.
 
@@ -61,7 +61,7 @@ Il triage per impatto ha bisogno di sapere **che tipo di progetto è** (il GUARD
      args: { lenses, targetFiles, targetLabel, exposureModel, requirementsSource, maxPerLens: 12 }
    })
    ```
-   (finder Opus per lente → dedup per file:righe → confutatore/validatore Haiku effort-high per finding → conteggi. Riprende da rate-limit con `resumeFromRunId` se serve.)
+   (finder Opus per lente → dedup per file:righe → confutatore/validatore Fable effort-high per finding → conteggi. Riprende da rate-limit con `resumeFromRunId` se serve.)
 3. **Se `Workflow` NON è disponibile** (gated/assente) → **fallback**: orchestra tu al top-level lo stesso pipeline con il tool `Agent` (un `bug-finder` per lente in parallelo → dedup → un `bug-refuter` per finding). ⚠️ Dichiara nel report che **senza `Workflow` non c'è resume da rate-limit** (una caccia lunga interrotta va rifatta).
 
 Non far spawnare sub-agenti ai finder (non possono): il fan-out lo fai **tu**.
@@ -84,5 +84,5 @@ Scrivi nel tracking **solo** ciò che l'utente conferma. Alla fine: breve riepil
 ---
 
 ## Note
-- **Costo/scala**: «light» = confutatori sul modello economico, non «poche verifiche». Molte lenti × molti finding = molti sub-agenti: su un diff sono pochi; su «tutto il progetto» avvisa del costo-tempo prima.
+- **Costo/scala («light»)**: light = **NON lanciare centinaia di agenti**. Finder **Opus** (uno per lente, pochi) + confutatori **Fable** (uno per finding, cap `maxPerLens: 12`) + **scope limitato** (path caldi, non «tutto il progetto» su codebase grandi). Molte lenti × tutto-il-progetto = salasso: **restringi il bersaglio** e avvisa del costo prima.
 - **R.16**: la caccia trova; le fix sono task a parte. Nulla va in DONE per aver girato la caccia.

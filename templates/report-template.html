@@ -1,0 +1,132 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- TEMPLATE for the keel /report command. The model fills this in for ONE project and writes design-log/report.html.
+     Keep the <style> block VERBATIM (this is the approved "your file" V3 look, light+dark). Replace only the body content
+     between the markers. All text in ENGLISH. Everything inline — no server, no network, no external assets. -->
+<title><!-- Project name --> — keel report</title>
+<style>
+  :root{--bg:#f7f7f5;--card:#fff;--text:#1d1f1e;--muted:#6b6f6d;--border:#e4e5e2;--accent:#0f6f68;--accent-soft:#e3efed;
+    --ok:#2c7a3f;--ok-soft:#e7f2e9;--warn:#a86a0a;--warn-soft:#f7eedd;--crit:#b4372f;--crit-soft:#f8e8e6;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  @media(prefers-color-scheme:dark){:root{--bg:#16181a;--card:#1e2124;--text:#e8e8e6;--muted:#9a9e9c;--border:#2c3033;--accent:#4fb3a9;--accent-soft:#1c2f2d;--ok:#6cc283;--ok-soft:#1d2b20;--warn:#ddab52;--warn-soft:#2e2617;--crit:#e07a70;--crit-soft:#33201e}}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font:16px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif;margin:0}
+  .wrap{max-width:1140px;margin:0 auto;padding:40px 24px 90px}
+  header .eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:600;margin-bottom:10px}
+  header h1{font-size:1.8rem;line-height:1.2;margin:0 0 8px;text-wrap:balance;letter-spacing:-.01em}
+  header .sub{color:var(--muted);margin:0;max-width:80ch}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin:26px 0 30px}
+  .tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:15px 16px}
+  .tile .n{font-size:1.9rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05}
+  .tile .l{font-size:.8rem;color:var(--muted);margin-top:4px;line-height:1.35}
+  .tile.ok .n{color:var(--ok)}.tile.crit .n{color:var(--crit)}.tile.warn .n{color:var(--warn)}.tile.acc .n{color:var(--accent)}
+  .layout{display:grid;grid-template-columns:1fr;gap:0}
+  @media(min-width:940px){.layout{grid-template-columns:172px minmax(0,1fr);gap:40px}}
+  nav.idx{display:none}
+  @media(min-width:940px){nav.idx{display:block;position:sticky;top:28px;align-self:start}
+    nav.idx ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+    nav.idx a{font-size:.82rem;color:var(--muted);text-decoration:none;line-height:1.4}
+    nav.idx a:hover{color:var(--accent)}
+    nav.idx .k{color:var(--accent);font-family:var(--mono);font-size:.78rem;display:inline-block;min-width:20px}}
+  main{min-width:0}
+  section{margin:0 0 34px;scroll-margin-top:24px}
+  h2{font-size:1.22rem;margin:0 0 4px;letter-spacing:-.01em}
+  .note{color:var(--muted);font-size:.9rem;margin:0 0 14px;max-width:84ch}
+  .find{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+  .find .head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:7px}
+  .find h3{font-size:1.04rem;margin:0}
+  .find .lead{margin:0;font-size:.93rem;color:var(--text);max-width:88ch}
+  .find ul.fields{list-style:none;margin:11px 0 0;padding:0}
+  .find ul.fields li{margin:6px 0;font-size:.9rem;color:var(--muted);max-width:90ch;line-height:1.5}
+  .find ul.fields li b{color:var(--text);font-weight:600}.find ul.fields li strong{color:var(--text);font-weight:600}
+  .chip{display:inline-block;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;font-family:var(--mono);letter-spacing:.02em}
+  .chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.crit{background:var(--crit-soft);color:var(--crit)}
+  .chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.acc{background:var(--accent-soft);color:var(--accent)}
+  .tu{color:var(--warn);font-weight:600}.io{color:var(--accent);font-weight:600}
+  code{font-family:var(--mono);font-size:.82em;background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+  a{color:var(--accent)}
+  footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--border);color:var(--muted);font-size:.88rem;max-width:84ch}
+  footer strong{color:var(--text)}
+</style></head><body>
+<div class="wrap">
+
+<!-- ============ HEADER ============ eyebrow = "keel report · <project> · <date> · your-file style"; h1 = one narrated line
+     summarizing where the project stands NOW; sub = one sentence on how to read it (grouped by type; Done at the bottom). -->
+<header>
+  <div class="eyebrow">keel report · <!-- project · date --></div>
+  <h1><!-- one-line narrated headline of the current state --></h1>
+  <p class="sub"><!-- how to read: entries grouped by type, each explained (what/why/how/status/who); "done" lives at the bottom, not mixed with the open work. --></p>
+</header>
+
+<!-- ============ STAT TILES ============ counts read from tracking. Use classes acc/warn/crit/ok. Drop tiles that are 0 and not meaningful. -->
+<div class="tiles">
+  <div class="tile acc"><div class="n"><!--N--></div><div class="l">to validate<br><!-- short note --></div></div>
+  <div class="tile warn"><div class="n"><!--N--></div><div class="l">to do</div></div>
+  <div class="tile acc"><div class="n"><!--N--></div><div class="l">open decisions</div></div>
+  <div class="tile crit"><div class="n"><!--N--></div><div class="l">open bugs</div></div>
+  <div class="tile ok"><div class="n"><!--N--></div><div class="l">recently done</div></div>
+</div>
+
+<div class="layout">
+<!-- ============ LETTER INDEX ============ one <li> per section actually rendered (skip empty ones). -->
+<nav class="idx" aria-label="Index">
+  <ol>
+    <li><a href="#a"><span class="k">A</span>In flight</a></li>
+    <li><a href="#b"><span class="k">B</span>To do</a></li>
+    <li><a href="#c"><span class="k">C</span>Bugs</a></li>
+    <li><a href="#d"><span class="k">D</span>Decisions</a></li>
+    <li><a href="#z"><span class="k">Z</span>Done</a></li>
+  </ol>
+</nav>
+
+<main>
+<!-- ============ SECTIONS ============ letter-indexed. One .find card per entry. Fields: What / Why / How / Status / Who.
+     Mark ownership with <span class="tu">You</span> (user does it — e.g. validate on screen) and <span class="io">I</span> (the agent does it).
+     Chip class: crit for bugs/blockers, warn for pending work, acc for neutral/info, ok for done. If a section is long, show the most
+     relevant entries and end with a <p class="note">+N more in <code>FILE.md</code></p> — never a bare count that hides the list. -->
+
+<section id="a">
+  <h2>A · In flight — the real block</h2>
+  <p class="note">Implemented and green, but not "done" until you see it running. (FOCUS: in-progress + to-validate.)</p>
+  <div class="find">
+    <div class="head"><span class="chip acc"><!-- tag --></span><h3><!-- entry title --></h3></div>
+    <p class="lead"><!-- one-line lead --></p>
+    <ul class="fields">
+      <li><b>What</b> — <!-- ... --></li>
+      <li><b>Why</b> — <!-- ... --></li>
+      <li><b>Status</b> — <!-- ... --></li>
+      <li><b>Who</b> — <span class="tu">You</span>: <!-- what the user must do --></li>
+    </ul>
+  </div>
+</section>
+
+<section id="b">
+  <h2>B · To do — code</h2>
+  <p class="note">The real backlog, from TODO (by priority).</p>
+  <!-- .find cards … each with Who = <span class="io">I</span> where the agent will do it -->
+</section>
+
+<section id="c">
+  <h2>C · Bugs</h2>
+  <p class="note">Open bugs from TO_FIX. If none: say "none open".</p>
+  <!-- .find cards with chip crit … -->
+</section>
+
+<section id="d">
+  <h2>D · Decisions</h2>
+  <p class="note">Open questions / things to discuss before building.</p>
+  <!-- .find cards with chip acc … -->
+</section>
+
+<section id="z">
+  <h2>Z · Done — no longer open</h2>
+  <p class="note">Kept here, at the bottom, so it is not re-opened by mistake. (DONE / FIXED, recent.)</p>
+  <!-- .find cards with chip ok … -->
+</section>
+</main>
+</div>
+
+<footer>
+  <p><strong>How this was built:</strong> states re-read from the project's tracking files right now, not from memory — nothing "implemented" counts as "done" until you see it on screen. Generated by keel <code>/report</code>, on demand.</p>
+</footer>
+</div>
+</body></html>

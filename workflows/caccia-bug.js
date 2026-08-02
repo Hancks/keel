@@ -95,7 +95,7 @@ function verifyPrompt(f, mode) {
 phase('Find')
 log(`Caccia su ${targetLabel} — lenti: ${lenses.join(', ')} — esposizione: ${exposureModel}`)
 const perLens = await parallel(lenses.map((lens) => () =>
-  agent(finderPrompt(lens), { label: `find:${lens}`, phase: 'Find', model: 'opus', agentType: 'bug-finder', schema: FINDINGS_SCHEMA })
+  agent(finderPrompt(lens), { label: `find:${lens}`, phase: 'Find', model: 'opus', agentType: 'keel:bug-finder', schema: FINDINGS_SCHEMA })
     .then((r) => (r && Array.isArray(r.findings) ? r.findings.map((f) => Object.assign({}, f, { lens })) : []))
 ))
 const allFindings = perLens.filter(Boolean).reduce((acc, arr) => acc.concat(arr), [])
@@ -113,7 +113,7 @@ log(`${allFindings.length} grezze → ${deduped.length} dopo dedup per file:righ
 // ---- VERIFY: un confutatore/validatore per finding, lens-aware, in parallelo ----
 phase('Verify')
 const verified = await parallel(deduped.map((f) => () =>
-  agent(verifyPrompt(f, modeFor(f.lenses[0])), { label: `verify:${f.file}`, phase: 'Verify', model: 'haiku', effort: 'high', agentType: 'bug-refuter', schema: VERDICT_SCHEMA })
+  agent(verifyPrompt(f, modeFor(f.lenses[0])), { label: `verify:${f.file}`, phase: 'Verify', model: 'fable', effort: 'high', agentType: 'keel:bug-refuter', schema: VERDICT_SCHEMA })
     .then((v) => Object.assign({}, f, { verdict: v }))
 ))
 const results = verified.filter(Boolean)
