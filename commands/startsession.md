@@ -696,6 +696,15 @@ Show the user that you UNDERSTOOD the context.
 
 If a `sprint.txt` file exists, **read it in full**.
 
+**Before auto-starting, verify the sprint is not STALE** (script-based detection, since 2026-08-03 — before, the end-of-session prune was prose only and got skipped):
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-check
+```
+- `verdict=SPRINT_FRESH` (or `SPRINT_NO_BASELINE` / `SPRINT_ABSENT`) → proceed with the normal auto-start.
+- `verdict=SPRINT_STALE` → ⚠️ **the last `/savesession` did NOT prune the sprint** (the marker UID doesn't match the most recent session log): it may contain **already-done/superseded** items. Do NOT run it blindly — **re-read it critically**, compare each item with the real state (`DONE`/`FIXED`/`TO_TEST`/`TODO`), **skip the already-closed ones**, **tell the user** the sprint was stale, and proceed only on the items that are genuinely open.
+
+**OUTPUT (add to the STEP 5 line):** `🏃 Sprint-check: verdict=[SPRINT_FRESH | SPRINT_STALE ⚠️ → re-reading critically, skipping done | NO_BASELINE | ABSENT]`
+
 If it contains items, **start executing RIGHT AWAY, WITHOUT asking for confirmation**: organize the execution plan and work as if the items were a request entered by the user via the console (create/update the files you need to update, apply the methodology, proceed). The auto-start is the **intended** behavior: the presence of `sprint.txt` IS already the authorization to start.
 
 ⚠️ Do **NOT** apply the STEP 5B checkpoint here: with `sprint.txt` present you do NOT wait for confirmation. (If a single item requires `/add-task` because the requirements aren't clear, apply that ceremony for THAT item — but don't stop the whole sprint.)

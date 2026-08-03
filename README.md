@@ -72,6 +72,7 @@ All commands are namespaced `/keel:…` (so they coexist with any other setup). 
 - **GUARDIAN** — the north-star + current objective + cardinal principles, re-injected by hooks so they never fade during a long session.
 - **Two memories** — *local* (facts about this project, in `design-log/LEARNED.md`) and *global* (universal principles of how you work, in `~/.claude-method/LEARNED_GLOBAL/`, shared across projects). Writes to memory always need your confirmation.
 - **Capture verbs (bilingual)** — `note · remember · jot · capture · remind` (and Italian `segna · appunta · annota · ricorda · memorizza · nota`).
+- **Sprint auto-start (`sprint.txt`)** — an optional plain-text file at the project root: a short, free-form list of the jobs to pick up next. If it's there, `/keel:startsession` **auto-starts** — it treats the items as your request and gets to work, no confirmation. `/keel:savesession` **prunes** it (drops done/superseded items) so tomorrow never restarts from a stale plan. A hand-off note to your next session.
 
 ## Cross-project memory (zero-config)
 

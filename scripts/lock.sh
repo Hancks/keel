@@ -605,6 +605,35 @@ cmd_scaffold() {
   echo "scaffold OK: $DLD"
 }
 
+# sprint.txt freshness gate — see /savesession 2b-ter and /startsession STEP 5.
+# The sprint auto-started by /startsession MUST be pruned at every /savesession;
+# prose alone got skipped (R.1), so this makes it script-verified (UID-based),
+# like progress-check/focus-check. sprint-mark stamps the current session's UID;
+# sprint-check compares it to the most recent session log's UID (mismatch=STALE).
+cmd_sprint_mark() {
+  local uid="${1:-}"
+  [ -n "$uid" ] || { echo "ERROR: uid argument required" >&2; exit 2; }
+  local F="sprint.txt"
+  [ -f "$F" ] || { echo "verdict=SPRINT_ABSENT"; return 0; }
+  local stamp tmp; stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ); tmp=$(mktemp)
+  grep -vE '^# sprint-pruned-(uid|at):' "$F" > "$tmp" 2>/dev/null || true
+  { cat "$tmp"; printf '\n# sprint-pruned-uid: %s\n# sprint-pruned-at: %s\n' "$uid" "$stamp"; } > "$F"
+  rm -f "$tmp"
+  echo "verdict=SPRINT_MARKED"; echo "sprint_pruned_uid=$uid"; echo "sprint_pruned_at=$stamp"
+}
+
+cmd_sprint_check() {
+  local F="sprint.txt"
+  [ -f "$F" ] || { echo "verdict=SPRINT_ABSENT"; return 0; }
+  local marker_uid last_log last_uid
+  marker_uid=$(grep -m1 -E '^# sprint-pruned-uid:' "$F" 2>/dev/null | sed -E 's/^# sprint-pruned-uid:[[:space:]]*//' | tr -d '[:space:]' || true)
+  last_log=$(ls -1 "$DL"/sessions/[0-9]*.md 2>/dev/null | sort | tail -1 || true)
+  [ -n "$last_log" ] || { echo "verdict=SPRINT_NO_BASELINE"; echo "sprint_marker_uid=${marker_uid:-none}"; return 0; }
+  last_uid=$(grep -m1 -E '^\*\*Session UID\*\*:' "$last_log" 2>/dev/null | sed -E 's/^\*\*Session UID\*\*:[[:space:]]*//' | tr -d '[:space:]' || true)
+  if [ -n "$marker_uid" ] && [ "$marker_uid" = "$last_uid" ]; then echo "verdict=SPRINT_FRESH"; else echo "verdict=SPRINT_STALE"; fi
+  echo "sprint_marker_uid=${marker_uid:-none}"; echo "last_session_uid=${last_uid:-none}"; echo "last_session_log=${last_log:-none}"
+}
+
 case "${1:-}" in
   guardian-block)        guardian_block ;;
   hook-sessionstart)     hooklog "SessionStart"; cmd_global_bootstrap >/dev/null 2>&1; guardian_block ;;
@@ -630,6 +659,8 @@ case "${1:-}" in
   method-check)          cmd_method_check ;;
   inbox-check)           cmd_inbox_check ;;
   focus-check)           cmd_focus_check ;;
+  sprint-check)          cmd_sprint_check ;;
+  sprint-mark)           shift; cmd_sprint_mark "$@" ;;
   scaffold)              cmd_scaffold ;;
   *) echo "usage: lock.sh {guardian-block|hook-*|learned-approve[-clear]|global-dir|global-bootstrap|detect-type|north-star|preflight|status|init|share|add-file|release|end|progress-check|method-check|inbox-check|focus-check|scaffold}" >&2; exit 2 ;;
 esac

@@ -121,10 +121,15 @@ If `sprint.txt` exists in the project root:
 3. **Prune**: REMOVE the completed/validated items and the superseded ones; UPDATE the partial ones to the real state (with a note); keep ONLY what truly remains to do.
 4. If after the prune it is empty (all done): leave just the header/comment and flag it — a sprint full of already-done stuff is a plan that **LIES** to the next `/startsession`.
 5. The prune **removes/updates, does not add**: new work goes to `TODO.md`, not to the sprint.
+6. **STAMP the prune (MANDATORY — makes the prune script-verifiable, not just skippable prose):** after re-pruning, run
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-mark <MYUID>   # MYUID = THIS session's UID (announced at /startsession STEP 0.5)
+   ```
+   This writes the `# sprint-pruned-uid: <MYUID>` marker into `sprint.txt`. At the next `/startsession`, `sprint-check` compares that UID with the **most recent session log's** UID: if they don't match (a close skipped the prune) → verdict `SPRINT_STALE` + loud warning. **Do NOT move to STEP 4/5 without running `sprint-mark`** (skip if `sprint.txt` is absent).
 
 **MANDATORY OUTPUT:**
 ```
-🏃 Prune sprint.txt: [N items reviewed · K removed (done/superseded) · J updated · remaining: <1-line summary> | sprint.txt absent → skip]
+🏃 Prune sprint.txt: [N items reviewed · K removed (done/superseded) · J updated · remaining: <1-line summary> | sprint.txt absent → skip] · sprint-mark: [SPRINT_MARKED uid=<MYUID> | skip (absent)]
 ```
 
 #### 2b-quater: 📄 ASK YOURSELF whether there are reports/artifacts to update (FORCING)

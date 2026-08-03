@@ -111,6 +111,22 @@ It loads the most recent session by name, shows the handoff notes and the curren
 
 ---
 
+## Resume from a sprint (`sprint.txt`)
+
+Some days you already know where tomorrow starts. Drop a **`sprint.txt`** at the project root — a short, free-form list of the jobs to pick up next, one per line:
+
+```
+1. Finish the checkout flow (payment step + confirmation email).
+2. Document the new config file in the README.
+3. Field-test the import command on a real dataset.
+```
+
+Next time you run `/keel:startsession`, keel reads it and **auto-starts** — it treats the items as your request and gets to work, without a "shall I proceed?". At the other end, `/keel:savesession` **prunes** it: done and superseded items are removed and partial ones updated, so the next session never restarts from a stale plan.
+
+Write it yourself at the end of a session (or ask keel to write it), as a hand-off to your next self. It's optional — with no `sprint.txt`, `/keel:startsession` simply shows where you left off and suggests a next step.
+
+---
+
 ## 7. See where things stand
 
 **Cross-project glance:**

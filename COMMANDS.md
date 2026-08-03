@@ -26,6 +26,8 @@ All commands are namespaced **`/keel:<name>`** so they coexist with any other se
 **Usage** — `/keel:resumesession [session-file-name]`
 **Example** — `/keel:resumesession 2026-08-01-20-56` → loads that session's summary + handoff notes.
 
+> **`sprint.txt` — auto-start (no command).** An optional plain-text file at the project root: a short, free-form list of the jobs to pick up next (one per line). If present, `/keel:startsession` **auto-starts** it — treating the items as your request — and `/keel:savesession` **prunes** it (drops done/superseded items). A hand-off to your next session.
+
 ---
 
 ## Doing the work
