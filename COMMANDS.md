@@ -15,7 +15,7 @@ All commands are namespaced **`/keel:<name>`** so they coexist with any other se
 **Example** — Open a fresh folder → `/keel:startsession` → keel scaffolds `design-log/` in English, sees `PROJECT.md` is empty, and asks you what the project is.
 
 ### `/keel:savesession`
-**What** — Closes cleanly. It sweeps the whole conversation so no request is lost, triages `INBOX` (blocking), syncs the tracking files, **prunes `FOCUS`** and **prunes `sprint.txt`** (removes done/superseded items), **asks itself** whether any report/artifact (e.g. `design-log/report.html`) went stale and updates it, extracts and classifies any new lessons (with your confirmation), writes a **session log**, and removes the session marker.
+**What** — Closes cleanly. It sweeps the whole conversation so no request is lost, triages `INBOX` (blocking), syncs the tracking files, **prunes `FOCUS`** and **prunes `sprint.txt`** (removes done/superseded items), **asks itself** whether any report/artifact (e.g. `reports/report.html`, `reports/dashboard.html`) went stale and updates it, **asks before stopping** the local reports server, extracts and classifies any new lessons (with your confirmation), writes a **session log**, and removes the session marker.
 **When** — Before ending, before switching context, after a milestone, or when the conversation gets long.
 **Usage** — `/keel:savesession`
 **Example** — After finishing a feature → `/keel:savesession` → the item moves to `TO_TEST` (implemented, not yet validated by you), the sprint is pruned, a session log is written.
@@ -61,10 +61,10 @@ All commands are namespaced **`/keel:<name>`** so they coexist with any other se
 
 ---
 
-## Views (read-only, self-contained)
+## Views & local reports
 
 ### `/keel:dashboard`
-**What** — Generates and opens **one self-contained HTML page** (no server, no network) with a **cross-project overview** (objective, counts, staleness, untriaged inbox) and per-project client-side drill-in. Rendered deterministically from your design-log files; auto-refreshed at the end of each turn.
+**What** — Generates and opens **one self-contained HTML page** (all data inline, no external network) with a **cross-project overview** (objective, counts, staleness, untriaged inbox) and per-project client-side drill-in. Rendered deterministically from your design-log files; served locally from `reports/` and auto-refreshed at the end of each turn.
 **When** — For a quick glance across projects.
 **Usage** — `/keel:dashboard [root-or-project …]` (no args → uses `KEEL_DASHBOARD_ROOTS`, then `$KEEL_GLOBAL_DIR/dashboard.roots`, then the current dir)
 **Example** — `/keel:dashboard ~/Projects` → aggregates every project with a `design-log/` under that root.
@@ -73,7 +73,13 @@ All commands are namespaced **`/keel:<name>`** so they coexist with any other se
 **What** — Writes and opens a **narrated per-project report** — a rich "your file" page (eyebrow · stat tiles · letter-index · one card per item with *what / why / how / status / who* and **You/I** markers · "done" at the bottom), composed by the model from the real tracking. On-demand (it is NOT auto-refreshed, unlike the dashboard).
 **When** — When you want a readable, narrated status of one project (to review or share).
 **Usage** — `/keel:report [project-path]` (no args → the current project)
-**Example** — `/keel:report` → writes `design-log/report.html` and opens it.
+**Example** — `/keel:report` → writes `reports/report.html`, ensures the local server, and opens `http://127.0.0.1:<port>/report.html`.
+
+### `/keel:serve-reports`
+**What** — Manages the **local reports server**: a per-project static server, bound to `127.0.0.1` only (never exposed off your machine), that serves the gitignored `reports/` folder — the local hub for everything keel writes for you (the narrated report, the dashboard, any update page), reachable at a stable `http://127.0.0.1:<port>/` URL with an auto-updating index. Idempotent; **one server per project** (port + PID recorded in `reports/.server.json`; first free port from `8912`, override with `KEEL_REPORTS_PORT`).
+**When** — Rarely by hand — `/report` and `/dashboard` start it for you. Use it to start it explicitly, check status, or stop it. `/startsession` restarts it if it was left registered; `/savesession` asks before stopping it.
+**Usage** — `/keel:serve-reports [start|stop|status]` (no args → `status`)
+**Example** — `/keel:serve-reports start` → prints `http://127.0.0.1:8912/`; drop any self-contained `.html` into `reports/` and it appears in the index.
 
 ---
 

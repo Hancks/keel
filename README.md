@@ -13,8 +13,9 @@ Not better prompts — a process that holds.
 - **GUARDIAN** — re-injects the project's north-star, current objective, and cardinal principles so the agent never loses the thread (at session start, when a new task begins, after a context compaction).
 - **Lossless capture** — every "note this" is written down the moment it's said.
 - **Hard-blocks** — edits are denied when there's no active session or no declared objective; a turn can't end while a request is left uncaptured.
-- **Local dashboard** — one self-contained page (no server, no network) with a cross-project overview and per-project drill-in — objective / left / done — rendered from your design-log files. Open it with `/dashboard`.
+- **Local dashboard** — one self-contained page (all data inline, no external network) with a cross-project overview and per-project drill-in — objective / left / done — rendered from your design-log files, served locally. Open it with `/dashboard`.
 - **Narrated report** — a per-project report **on demand**, written by the model in a rich "your file" style (grouped by type; each item explained — what / why / how / status / who — with You/I markers, and "done" at the bottom). One self-contained page; open it with `/report`.
+- **Local reports server** — everything keel writes for you (the narrated report, the dashboard, any update page) lands in a per-project, gitignored `reports/` folder, served at a stable local URL on `127.0.0.1` — under your control, never on an external service. `/report` and `/dashboard` start it automatically; manage it with `/serve-reports`.
 
 ## Install
 
@@ -59,6 +60,7 @@ All commands are namespaced `/keel:…` (so they coexist with any other setup). 
 | `/keel:bug-hunt` | On-demand light bug hunt: a finder per lens (Opus) + adversarial refuters (Fable), report triaged by impact |
 | `/keel:dashboard` | Generate + open a self-contained cross-project dashboard (glance) |
 | `/keel:report` | Write + open a narrated per-project report ("your file" style) |
+| `/keel:serve-reports` | Manage the local reports server (`start` · `status` · `stop`) that serves `reports/` on `127.0.0.1` |
 | `/keel:sync-dlogs` | Safety net: re-sync the tracking files if they drifted |
 | `/keel:startsharedsession` · `/keel:stopsharedsession` | Coordinate 2+ parallel Claude sessions on the same repo (per-file locks) |
 | `/keel:startcoord` · `/keel:stopcoord` | A cross-project DAG plan visible from each sub's `/startsession` |
@@ -73,6 +75,7 @@ All commands are namespaced `/keel:…` (so they coexist with any other setup). 
 - **Two memories** — *local* (facts about this project, in `design-log/LEARNED.md`) and *global* (universal principles of how you work, in `~/.claude-method/LEARNED_GLOBAL/`, shared across projects). Writes to memory always need your confirmation.
 - **Capture verbs (bilingual)** — `note · remember · jot · capture · remind` (and Italian `segna · appunta · annota · ricorda · memorizza · nota`).
 - **Sprint auto-start (`sprint.txt`)** — an optional plain-text file at the project root: a short, free-form list of the jobs to pick up next. If it's there, `/keel:startsession` **auto-starts** — it treats the items as your request and gets to work, no confirmation. `/keel:savesession` **prunes** it (drops done/superseded items) so tomorrow never restarts from a stale plan. A hand-off note to your next session.
+- **Local reports (`reports/`)** — everything keel writes for you (the narrated report, the dashboard, any update page) lands in a per-project, gitignored `reports/` folder and is served over `127.0.0.1` only — a stable local URL, under your control, never on an external service. One server per project; `/report` and `/dashboard` start it automatically, `/keel:serve-reports` manages it, `/startsession` restarts it and `/savesession` asks before stopping it.
 
 ## Cross-project memory (zero-config)
 
@@ -98,10 +101,11 @@ README.md · COMMANDS.md · TUTORIAL.md  # docs: overview · command reference �
 hooks/hooks.json                 # SessionStart · UserPromptSubmit · PreToolUse · PostToolUse · PreCompact · Stop
 scripts/lock.sh                  # hook logic + session/method engine (init·gates·scaffold) + global memory
 scripts/dashboard.py             # cross-project dashboard generator
+scripts/serve-reports.sh         # per-project local static server for reports/ (ensure·stop·status)
 design-log/                      # bundled method docs (BEHAVIORS, METHODOLOGY) — self-contained
 skills/                          # guardian, design-log method, adversarial review, systematic debugging
 agents/                          # critic, verifier, tester, learned-distiller, bug hunters
-commands/                        # full method: startsession · add-task · savesession · merge-design-log · startcoord · … + bug hunt · dashboard · report
+commands/                        # full method: startsession · add-task · savesession · merge-design-log · startcoord · … + bug hunt · dashboard · report · serve-reports
 workflows/                       # bug-hunt orchestration
 templates/                       # narrated report page style (used by /report)
 principi/                        # cardinal principles: universal · per project-type · per project

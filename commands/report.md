@@ -24,7 +24,7 @@ Read these files where present — states come from the tracking **right now**, 
 
 ## 3. Compose the report
 
-- Read the template `${CLAUDE_PLUGIN_ROOT}/templates/report-template.html`. Keep its `<style>` block **verbatim** (approved light+dark "your file" look). Replace only the body content. Everything **inline** — no server, no network, no external asset. All text in **English** (even if the source design-log is in another language).
+- Read the template `${CLAUDE_PLUGIN_ROOT}/templates/report-template.html`. Keep its `<style>` block **verbatim** (approved light+dark "your file" look). Replace only the body content. Everything **self-contained** — no network, no external asset (it is served as a static file over loopback). All text in **English** (even if the source design-log is in another language).
 - Fill it in for THIS project:
   - **Eyebrow**: `keel report · <project name> · <today's date> · your-file style`. Get today's date from `date '+%-d %B %Y'`.
   - **Headline (h1)** + **sub**: one narrated line on where the project stands now, and one on how to read it.
@@ -39,10 +39,14 @@ Read these files where present — states come from the tracking **right now**, 
   - **Cap**: if a section is long, show the most relevant entries and end it with `<p class="note">+N more in <code>FILE.md</code></p>`. Never a bare count that hides the list.
   - Keep the footer's spirit: states re-read from tracking, not memory; implemented ≠ done until seen on screen.
 
-## 4. Write and open
+## 4. Write, serve, and open
 
-- Write the finished HTML to `<project>/design-log/report.html` (overwrite any previous one).
-- Open it: `open "<path>"` on macOS, `xdg-open "<path>"` on Linux.
-- Tell the user the path and that `/report` is **on-demand** — it is NOT auto-refreshed (that's the dashboard's job). Re-run `/report` to refresh it.
+- Write the finished HTML to `<project>/reports/report.html` (overwrite any previous one). `reports/` is keel's local, gitignored hub for everything it writes for you — served locally, never published to claude.ai.
+- Ensure the local report server is up and capture its base URL (created on first use, reused after; binds to `127.0.0.1` only):
+  ```bash
+  URL="$(${CLAUDE_PLUGIN_ROOT}/scripts/serve-reports.sh ensure)"
+  ```
+- Open the served page: `open "${URL}report.html"` on macOS, `xdg-open "${URL}report.html"` on Linux.
+- Tell the user the **local URL** `http://127.0.0.1:<port>/report.html` (and that `reports/index.html` lists everything served). `/report` is **on-demand** — it is NOT auto-refreshed (that's the dashboard's job); re-run `/report` to refresh it.
 
-> Complements `/dashboard`: the dashboard auto-renders a cross-project glance every turn; `/report` writes a rich, narrated, single-project page when you ask for it.
+> Complements `/dashboard`: the dashboard auto-renders a cross-project glance every turn; `/report` writes a rich, narrated, single-project page when you ask for it. Both are served locally from `reports/` (see `/serve-reports`).

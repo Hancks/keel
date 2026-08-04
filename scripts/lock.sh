@@ -264,7 +264,14 @@ cmd_hook_stop() {
   hooklog "Stop (inbox_untriaged=$untriaged)"
   # auto-refresh of the cross-project dashboard: regenerate the HTML at end of turn (always fresh).
   # No args → uses the config (KEEL_DASHBOARD_ROOTS / dashboard.roots / cwd). Writes to <GLOBAL_DIR>/dashboard/.
-  python3 "$PLUGIN_ROOT/scripts/dashboard.py" >/dev/null 2>&1 || true
+  local dash_out; dash_out="$(python3 "$PLUGIN_ROOT/scripts/dashboard.py" 2>/dev/null | tail -1)"
+  # If the local report server is registered for THIS project: keep the served dashboard copy
+  # fresh and regenerate the reports/ index — so any "update" left in the folder (user↔method
+  # communication) shows up on its own at the end of the turn.
+  if [ -f "$PROJECT_DIR/reports/.server.json" ]; then
+    [ -n "$dash_out" ] && [ -f "$dash_out" ] && cp "$dash_out" "$PROJECT_DIR/reports/dashboard.html" 2>/dev/null || true
+    CLAUDE_PROJECT_DIR="$PROJECT_DIR" "$PLUGIN_ROOT/scripts/serve-reports.sh" reindex >/dev/null 2>&1 || true
+  fi
   # BLOCKING sweep (FM2 "lose nothing"): do not end the turn with untriaged captures.
   # Anti-loop escape: the model may mark them DEFERRED ('- [ ]' → '- [>]') → they no longer count.
   if [ "${untriaged:-0}" -gt 0 ] 2>/dev/null; then

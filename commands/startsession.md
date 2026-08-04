@@ -629,6 +629,23 @@ If there are notes, **read them** (they are short and addressed to this sub) and
 
 ---
 
+### STEP 3.6: 🌐 Local reports server (restart if registered but down)
+
+> keel serves reports, the dashboard, and any update page locally from `<project>/reports/` — the hub for user↔method communication, on `127.0.0.1` (never exposed). If a previous session left a server registered but it's now down, restart it so reports are immediately reachable. If none is registered → zero overhead, skip.
+
+Only if `reports/.server.json` exists:
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/serve-reports.sh ensure
+```
+`ensure` is idempotent: if the server is already alive it reuses the same URL; if it was down it restarts it (first free port from `8912`). It prints the base URL and regenerates `reports/index.html`.
+
+**MANDATORY OUTPUT:**
+```
+🌐 Reports server: [restarted → http://127.0.0.1:<port>/ (index: reports/index.html) | already running → <url> | none registered → skip]
+```
+
+---
+
 ### STEP 4: Generate the summary
 
 Show the user that you UNDERSTOOD the context.

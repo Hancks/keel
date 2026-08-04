@@ -134,16 +134,36 @@ If `sprint.txt` exists in the project root:
 
 #### 2b-quater: 📄 ASK YOURSELF whether there are reports/artifacts to update (FORCING)
 
-> Some projects have "showcase" files **derived from state** — e.g. the `/report` output (`design-log/report.html`), a dashboard, other artifacts/reports. They do NOT auto-update at the end of work → they stay stale (the RECURRING gap: files misaligned at reopening). The method must **ask itself ON ITS OWN** at every close, not wait for the user to say so.
+> Some projects have "showcase" files **derived from state** — e.g. the `/report` output (`reports/report.html`), the dashboard (`reports/dashboard.html`), other "update"/artifact pages in the served `reports/` folder. They do NOT auto-update at the end of work → they stay stale (the RECURRING gap: files misaligned at reopening). The method must **ask itself ON ITS OWN** at every close, not wait for the user to say so.
 
 **Ask yourself**: did anything change in this session that one or more of these files should reflect?
-1. **Look for** the project's reports/artifacts: `design-log/report.html`, a dashboard, `.html`/artifacts in `design-log/`, files cited as "report/showcase" in FOCUS/PROJECT_UPDATES.
+1. **Look for** the project's reports/artifacts: the served `reports/` folder (`report.html`, `dashboard.html`, the various updates), any `.html`/artifacts in `design-log/`, files cited as "report/showcase" in FOCUS/PROJECT_UPDATES.
 2. For each, assess whether it is **stale** relative to the state just synced (2b).
-3. If it is stale → **update/regenerate it** (or re-run the command that produces it, e.g. `/report`). Do not leave it stale silently: if you decide NOT to regenerate it (e.g. costly and not needed), **say so explicitly** in the summary with the why.
+3. If it is stale → **update/regenerate it** (or re-run the command that produces it, e.g. `/report`, `/dashboard`). Do not leave it stale silently: if you decide NOT to regenerate it (e.g. costly and not needed), **say so explicitly** in the summary with the why.
 
 **MANDATORY OUTPUT:**
 ```
 📄 Reports/artifacts: [found: <list> · updated: <which> · left (why): <which> | none]
+```
+
+#### 2b-quinquies: 🌐 Local reports server — ASK before stopping (FORCING if registered)
+
+> If a local report server is running for this project (`reports/.server.json`), it is **not stopped silently by default** at the end of the session: the user explicitly asked to be consulted about the server's state (some keep it running to browse reports between sessions).
+
+Only if `reports/.server.json` exists:
+1. Read its state:
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/scripts/serve-reports.sh status
+   ```
+2. **ASK the user** whether to leave it running or stop it. Default = **leave it running** (no action).
+3. Only if the user says to stop it:
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/scripts/serve-reports.sh stop
+   ```
+
+**MANDATORY OUTPUT:**
+```
+🌐 Reports server: [running <url> → left on (default) | stopped on request | none registered → skip]
 ```
 
 #### 2c: Verify and update the Design Log (if it exists)
@@ -418,7 +438,7 @@ After Claude runs `/savesession`, check:
 - [ ] Did it write to DONE/FIXED ONLY work **validated** by the user (implemented-not-validated → TO_TEST + FOCUS 🧪)?
 - [ ] Did it run the **FOCUS prune** (2b-bis): `focus_bloat=no` on re-check (or prune DEFERRED with a note because FOCUS was locked by another session)?
 - [ ] Did it **review and prune `sprint.txt`** (2b-ter): removed done/superseded items, updated the state — no stale sprint for the next `/startsession`?
-- [ ] Did it **ask itself** (2b-quater) whether there were stale reports/artifacts (e.g. `design-log/report.html`, dashboard), and update/regenerate them (or explicitly say why not)?
+- [ ] Did it **ask itself** (2b-quater) whether there were stale reports/artifacts (e.g. `reports/report.html`, `reports/dashboard.html`), and update/regenerate them (or explicitly say why not)? And (2b-quinquies) **ask before stopping** the local reports server?
 - [ ] Did it update `FOCUS.md` (closed items removed, only ONE 🔄 in progress, history moved down to the session log)?
 - [ ] Did it route the items into the split files (DONE/FIXED/TODO/TO_FIX/TO_TEST) and update PROGRESS.md index + counters?
 - [ ] Did it archive to progress.old.md if DONE.md/FIXED.md exceeded ~400 lines?
