@@ -2,7 +2,7 @@ export const meta = {
   name: 'bug-hunt',
   description: 'Light bug hunt: one finder per lens (Opus) + one refuter/validator per finding (Fable, effort high), with dedup, triage and counts. Does NOT write files: it returns the data; the top-level command writes the report.',
   phases: [
-    { title: 'Find', detail: 'one Opus finder per selected lens' },
+    { title: 'Find', detail: 'one Opus finder per selected lens and per functional flow' },
     { title: 'Verify', detail: 'one Fable refuter/validator per finding (after dedup)' },
   ],
 }
@@ -14,10 +14,15 @@ const targetLabel = (args && args.targetLabel) || (targetFiles.length ? targetFi
 const exposureModel = (args && args.exposureModel) || 'unknown'
 const requirementsSource = (args && args.requirementsSource) || null
 const maxPerLens = (args && Number.isInteger(args.maxPerLens)) ? args.maxPerLens : 12
+// functional flows (expected-result method): [{ label, spec }]
+const functionalFlows = (args && Array.isArray(args.functionalFlows)) ? args.functionalFlows : []
 
 // "bug" lenses (adversarial refutation) vs "non-bug" lenses (validate the observation)
 const BUG_LENSES = ['security', 'permissions', 'data', 'robustness', 'correctness']
-function modeFor(lens) { return BUG_LENSES.indexOf(lens) >= 0 ? 'bug' : 'validation' }
+function modeFor(lens) {
+  if (typeof lens === 'string' && lens.indexOf('flow:') === 0) return 'bug' // functional flows are bug mode (expected-vs-obtained)
+  return BUG_LENSES.indexOf(lens) >= 0 ? 'bug' : 'validation'
+}
 
 const FINDINGS_SCHEMA = {
   type: 'object',
@@ -35,6 +40,12 @@ const FINDINGS_SCHEMA = {
           scenario: { type: 'string' },
           impact: { type: 'string', enum: ['A', 'B-public', 'B-technical', 'C'] },
           note: { type: 'string' },
+          // structured fields ONLY for functional-flow findings (expected-result method)
+          object: { type: 'string' },
+          preconditions: { type: 'string' },
+          sequence: { type: 'string' },
+          expected: { type: 'string' },
+          obtained: { type: 'string' },
         },
         required: ['area', 'file', 'lines', 'scenario', 'impact'],
       },
@@ -72,6 +83,23 @@ function finderPrompt(lens) {
   ].filter(Boolean).join('\n\n')
 }
 
+function functionalFinderPrompt(flow) {
+  const label = (flow && flow.label) || '(flow)'
+  const spec = (flow && flow.spec) || ''
+  const target = targetFiles.length
+    ? `Target (read these WHOLE files with your Read/Grep/Glob):\n${targetFiles.map(f => '- ' + f).join('\n')}`
+    : 'Target: the WHOLE project (start from the main source files; use Grep/Glob to orient yourself).'
+  return [
+    `You are the bug-hunt finder. ASSIGNED FUNCTIONAL FLOW: **${label}**. Use the EXPECTED-RESULT METHOD.`,
+    `Project exposure model: **${exposureModel}** (use it to estimate impact).`,
+    target,
+    spec
+      ? `Expected anchored to intent (the flow's spec/source):\n${spec}`
+      : `WARNING: no spec for this flow → derive the expected from design-logs/README/spec; if you can only get it from the code under test, mark it "(assumed, unverified)" inside the expected field and don't treat it as certain.`,
+    `Proceed BY TEST: object → preconditions → sequence → EXPECTED (from intent, NEVER from the behavior of the code under test) → OBTAINED (from the real code, traced). Report a bug ONLY if EXPECTED ≠ OBTAINED, with real file:lines of the divergence point. Fill the structured fields object/preconditions/sequence/expected/obtained. Cite REAL lines. At most ${maxPerLens} findings; if expected and obtained match, return findings: [].`,
+  ].filter(Boolean).join('\n\n')
+}
+
 function verifyPrompt(f, mode) {
   return [
     `Judge ONE single bug-hunt finding. MODE: **${mode}**.`,
@@ -83,22 +111,33 @@ function verifyPrompt(f, mode) {
     `- scenario: ${f.scenario}`,
     `- impact (finder's estimate): ${f.impact}`,
     f.note ? `- note: ${f.note}` : '',
+    (f.expected || f.obtained)
+      ? `- object: ${f.object || ''}\n- preconditions: ${f.preconditions || ''}\n- sequence: ${f.sequence || ''}\n- expected: ${f.expected || ''}\n- obtained: ${f.obtained || ''}`
+      : '',
     mode === 'validation' && requirementsSource ? `Requirements source (if lens=requirements):\n${requirementsSource}` : '',
     `Step zero ALWAYS: verify that ${f.file}:${f.lines} exists and says what the finding claims; if not → REFUTED/INVALID (hallucinated).`,
     mode === 'bug'
-      ? `Bug mode: try to REFUTE it by reading the real code; when in doubt REFUTE. Verdict CONFIRMED/REFUTED with evidence (real file:line).`
+      ? ((f.expected || f.obtained)
+          ? `Bug mode (FUNCTIONAL FLOW): verify on the real code that (1) the OBTAINED is true, (2) EXPECTED ≠ OBTAINED holds, (3) the EXPECTED is anchored to INTENT (design-log/spec/user), NOT the code under test restated (circular expected = REFUTED). Verdict CONFIRMED/REFUTED with the real file:line of the divergence point.`
+          : `Bug mode: try to REFUTE it by reading the real code; when in doubt REFUTE. Verdict CONFIRMED/REFUTED with evidence (real file:line).`)
       : `Validation mode: VERIFY the observation (dead-code→search for uses with Grep; efficiency→is it material?; requirements→does it really violate the source?). Verdict VALID/INVALID with evidence.`,
   ].filter(Boolean).join('\n')
 }
 
-// ---- FIND: one finder per lens, in parallel (barrier so we can dedup cross-lens) ----
+// ---- FIND: one finder per lens AND per functional flow, in parallel (barrier so we can dedup) ----
 phase('Find')
-log(`Hunting on ${targetLabel} — lenses: ${lenses.join(', ')} — exposure: ${exposureModel}`)
-const perLens = await parallel(lenses.map((lens) => () =>
+log(`Hunting on ${targetLabel} — lenses: ${lenses.join(', ') || '—'} — flows: ${functionalFlows.length} — exposure: ${exposureModel}`)
+const lensTasks = lenses.map((lens) => () =>
   agent(finderPrompt(lens), { label: `find:${lens}`, phase: 'Find', model: 'opus', agentType: 'keel:bug-finder', schema: FINDINGS_SCHEMA })
     .then((r) => (r && Array.isArray(r.findings) ? r.findings.map((f) => Object.assign({}, f, { lens })) : []))
-))
-const allFindings = perLens.filter(Boolean).reduce((acc, arr) => acc.concat(arr), [])
+)
+const flowTasks = functionalFlows.map((flow) => () => {
+  const lens = 'flow:' + ((flow && flow.label) || '?')
+  return agent(functionalFinderPrompt(flow), { label: `find:${lens}`, phase: 'Find', model: 'opus', agentType: 'keel:bug-finder', schema: FINDINGS_SCHEMA })
+    .then((r) => (r && Array.isArray(r.findings) ? r.findings.map((f) => Object.assign({}, f, { lens })) : []))
+})
+const perFinder = await parallel(lensTasks.concat(flowTasks))
+const allFindings = perFinder.filter(Boolean).reduce((acc, arr) => acc.concat(arr), [])
 
 // dedup by file:lines (merges lenses that hit the same spot)
 const byKey = {}
@@ -126,6 +165,7 @@ return {
   target: targetLabel,
   exposureModel,
   lenses,
+  functionalFlows: functionalFlows.map((fl) => (fl && fl.label) || '?'),
   counts: { raw: allFindings.length, deduped: deduped.length, confirmed: confirmed.length, rejected: rejected.length },
   confirmed,
   rejected,

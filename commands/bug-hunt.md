@@ -10,24 +10,44 @@ You look for what is **already broken and visible** in the code, on-demand, with
 
 Run by the **top-level** agent (which owns the `Workflow` tool; sub-agents don't). Invoking this command **is** the authorization to use `Workflow`.
 
+> 📖 **Canonical methodology**: `${CLAUDE_PLUGIN_ROOT}/principi/bug-hunt-method.md` — the 5 canonical lenses + the **expected-result method** for functional flows. It's the source; the finder (`agents/bug-finder.md`) applies it. Read it if a detail of the method is unclear.
+
 ---
+
+## STEP 0 — Help (if `$ARGUMENTS` is `help` / `--help`)
+
+If the user runs `/bug-hunt help` (or `--help`), **do NOT launch anything**: declare the methodology and stop. Print:
+- The **5 canonical lenses** (with what each looks for): `correctness` (does it do what it promises?) · `robustness` (holds up to errors/edges/interruptions?) · `security` (what's exposed/forgeable?) · `permissions` (who can do what, in the right context?) · `data` (coherent, atomic writes?).
+- The **functional-flow lenses** (expected-result method): `object → preconditions → sequence → EXPECTED (from intent) → OBTAINED (from code) → expected ≠ obtained ⇒ bug`; flows are derived from design-logs + code + user Q&A; the expected is **anchored to intent**, never to the code under test.
+- The **optional extras** (non-bug, validated): `dead-code · efficiency · requirements`.
+- Point to `principi/bug-hunt-method.md` for the detail.
 
 ## STEP 1 — Choose the lenses (menu)
 
-Ask with **AskUserQuestion** (multiSelect) which lenses to enable. Catalog (one or more, including non-bug):
+The **5 canonical lenses** (always offered) + 3 optional extras. Ask with **AskUserQuestion** (multiSelect) which to enable:
 
 | Lens | Looks for | Mode |
 |---|---|---|
-| `correctness` | logic that doesn't do what it promises | bug |
-| `security` | injection, secrets, unvalidated input, SSRF/path traversal | bug |
-| `permissions` | missing/bypassable authz, isolation, IDOR | bug |
-| `data` | loss/corruption, non-atomicity, derived-vs-recorded state | bug |
-| `robustness` | what-if: fail halfway, network down, empty/huge input, constant-value-that-changes | bug |
+| `correctness` ⭐ | logic that doesn't do what it promises | bug |
+| `robustness` ⭐ | what-if: fail halfway, network down, empty/huge input, constant-value-that-changes | bug |
+| `security` ⭐ | injection, secrets, unvalidated input, SSRF/path traversal | bug |
+| `permissions` ⭐ | missing/bypassable authz, isolation, IDOR | bug |
+| `data` ⭐ | loss/corruption, non-atomicity, derived-vs-recorded state | bug |
 | `dead-code` | functions/branches never reached | validation |
 | `efficiency` | material redundant work (hot path) | validation |
 | `requirements` | where the code violates the requirements source | validation |
 
-If the user passed lenses as arguments (`$ARGUMENTS`), use them and skip the menu.
+⭐ = the 5 canonical ones. If the user passed lenses as arguments (`$ARGUMENTS`), use them and skip the menu.
+
+## STEP 1.5 — Functional-flow lenses (expected-result method) — recommended for correctness
+
+Beyond the pattern lenses, generate **functional-flow lenses**: one test per flow, with `object → preconditions → sequence → expected → obtained` (see `principi/bug-hunt-method.md`). Procedure:
+1. **Derive the flows** from the 3 sources: (a) **design logs / spec** (`design-log/*.md`, NORTH_STAR, README); (b) **code** (to reconstruct intent and the entry points); (c) hold them as a proposal.
+2. **Confirm/integrate with the user** (AskUserQuestion): present the derived flows (name + expected in one line), the user confirms / integrates / cuts. Cap to the most important ones (it's "light").
+3. For each confirmed flow build `{ label, spec }` where `spec` = the **expected anchored to intent** + the source it comes from (design-log/spec/user). If the expected rests only on the code → mark it "assumed".
+4. Pass them to the engine as `functionalFlows` (STEP 4). Each becomes a **separate finder**.
+
+If no requirements are derivable and the user provides none → **skip the functional flows** (don't invent the expected) and proceed with the pattern lenses only, stating so in the report.
 
 ## STEP 2 — Target (default = current diff → whole files)
 
@@ -58,10 +78,10 @@ Impact triage needs to know **what kind of project this is** (the GUARDIAN may b
    ```
    Workflow({
      scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/bug-hunt.js",
-     args: { lenses, targetFiles, targetLabel, exposureModel, requirementsSource, maxPerLens: 12 }
+     args: { lenses, functionalFlows, targetFiles, targetLabel, exposureModel, requirementsSource, maxPerLens: 12 }
    })
    ```
-   (Opus finder per lens → dedup by file:lines → Fable effort-high refuter/validator per finding → counts. Resumes from a rate-limit with `resumeFromRunId` if needed.)
+   (Opus finder per lens **and per functional flow** → dedup by file:lines → Fable effort-high refuter/validator per finding → counts. Resumes from a rate-limit with `resumeFromRunId` if needed.) `functionalFlows` = the flows confirmed at STEP 1.5 (`[{label, spec}]`); if empty, only the pattern lenses run.
 3. **If `Workflow` is NOT available** (gated/absent) → **fallback**: orchestrate the same pipeline yourself at the top level with the `Agent` tool (one `bug-finder` per lens in parallel → dedup → one `bug-refuter` per finding). ⚠️ State in the report that **without `Workflow` there's no resume from a rate-limit** (a long interrupted hunt has to be redone).
 
 Don't let the finders spawn sub-agents (they can't): the fan-out is done by **you**.
@@ -70,7 +90,7 @@ Don't let the finders spawn sub-agents (they can't): the fan-out is done by **yo
 
 As soon as the engine returns, **write the report immediately** — so nothing is lost at compaction (FM2):
 - Path: `design-log/bug-hunt/YYYY-MM-DD-HH-MM.md` (get date/time with `date +%Y-%m-%d-%H-%M`; create the folder if missing).
-- Content: header (target, lenses, exposure, counts raw→dedup→confirmed/rejected); the **confirmed grouped by impact** `A → B-public → B-technical → C`, each with `file:lines · scenario · refuter's evidence`; a **rejected** section (with the why); the false-negative **disclaimer** + "the trap-without-symptom is out of scope (it lives in `adversarial-review`)"; a final **"in one line"**.
+- Content: header (target, lenses, **functional flows tested**, exposure, counts raw→dedup→confirmed/rejected); the **confirmed grouped by impact** `A → B-public → B-technical → C`, each with `file:lines · scenario · refuter's evidence`; for **functional** findings also report `object · preconditions · sequence · expected · obtained` (and the mark "expected assumed, unverified" if the expected wasn't anchored to design-log/spec/user); a **rejected** section (with the why); the false-negative **disclaimer** + "the trap-without-symptom is out of scope (it lives in `adversarial-review`)"; a final **"in one line"**.
 
 ## STEP 6 — Item-by-item triage (Q4)
 
