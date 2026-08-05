@@ -638,6 +638,8 @@ cmd_sprint_check() {
   [ -n "$last_log" ] || { echo "verdict=SPRINT_NO_BASELINE"; echo "sprint_marker_uid=${marker_uid:-none}"; return 0; }
   last_uid=$(grep -m1 -E '^\*\*Session UID\*\*:' "$last_log" 2>/dev/null | sed -E 's/^\*\*Session UID\*\*:[[:space:]]*//' | tr -d '[:space:]' || true)
   if [ -n "$marker_uid" ] && [ "$marker_uid" = "$last_uid" ]; then echo "verdict=SPRINT_FRESH"; else echo "verdict=SPRINT_STALE"; fi
+  # FRESH/STALE = only "did the last session prune?" (UID match); neither verifies items are still OPEN (user may close them OUT OF SESSION → no new session log → UID still matches → FRESH forever). Always reconcile + confirm user/external items (startsession STEP 5A). (2026-08-05)
+  echo "reconcile=REQUIRED"; echo "fresh_means=last_session_pruned_only"
   echo "sprint_marker_uid=${marker_uid:-none}"; echo "last_session_uid=${last_uid:-none}"; echo "last_session_log=${last_log:-none}"
 }
 

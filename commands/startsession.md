@@ -717,14 +717,16 @@ If a `sprint.txt` file exists, **read it in full**.
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-check
 ```
-- `verdict=SPRINT_FRESH` (or `SPRINT_NO_BASELINE` / `SPRINT_ABSENT`) → proceed with the normal auto-start.
-- `verdict=SPRINT_STALE` → ⚠️ **the last `/savesession` did NOT prune the sprint** (the marker UID doesn't match the most recent session log): it may contain **already-done/superseded** items. Do NOT run it blindly — **re-read it critically**, compare each item with the real state (`DONE`/`FIXED`/`TO_TEST`/`TODO`), **skip the already-closed ones**, **tell the user** the sprint was stale, and proceed only on the items that are genuinely open.
+> ⚠️ **FRESH ≠ "items still open" (2026-08-05).** `sprint-check` tells you **only** whether the last session pruned the sprint (UID match); it does **not** verify the items are still open. The user can close items **out of session** (publish, file a submission, run a field-test) → no new session log → the UID still matches → **FRESH "forever" on stale content**. That's why the script now prints `reconcile=REQUIRED`: reconciliation is **mandatory in every case**.
 
-**OUTPUT (add to the STEP 5 line):** `🏃 Sprint-check: verdict=[SPRINT_FRESH | SPRINT_STALE ⚠️ → re-reading critically, skipping done | NO_BASELINE | ABSENT]`
+- `verdict=SPRINT_FRESH` (or `SPRINT_NO_BASELINE` / `SPRINT_ABSENT`) → the last session pruned (or there's no baseline). **Still do NOT start blindly**: (a) **reconcile each item** against the real state (`DONE`/`FIXED`/`TO_TEST`/`TODO`/`FOCUS`) and **skip the already-closed ones**; (b) for **user-completable / external** items (publications, submissions, purchases, a field-test the user runs, third-party waits) a script **cannot** know whether you already closed them out of session → **list them and CONFIRM with the user** they're still open **before** executing. Auto-execute RIGHT AWAY **only** the **in-repo items verified still open**.
+- `verdict=SPRINT_STALE` → ⚠️ **the last `/savesession` did NOT prune the sprint** (the marker UID doesn't match the most recent session log): it almost certainly contains **already-done/superseded** items. Same reconciliation as the FRESH case but with maximum suspicion — **re-read it critically**, **skip the already-closed ones**, **tell the user** the sprint was stale, and proceed only on the genuinely-open items (confirming the user-gated ones).
 
-If it contains items, **start executing RIGHT AWAY, WITHOUT asking for confirmation**: organize the execution plan and work as if the items were a request entered by the user via the console (create/update the files you need to update, apply the methodology, proceed). The auto-start is the **intended** behavior: the presence of `sprint.txt` IS already the authorization to start.
+**OUTPUT (add to the STEP 5 line):** `🏃 Sprint-check: verdict=[…] · reconcile=REQUIRED → reconciling each item vs real state + confirming user-gated/external items before executing`
 
-⚠️ Do **NOT** apply the STEP 5B checkpoint here: with `sprint.txt` present you do NOT wait for confirmation. (If a single item requires `/add-task` because the requirements aren't clear, apply that ceremony for THAT item — but don't stop the whole sprint.)
+For the **in-repo items verified still open** by the reconciliation (above), **start executing RIGHT AWAY, WITHOUT asking for confirmation**: organize the execution plan and work as if they were a request entered by the user via the console (create/update the files, apply the methodology, proceed). Auto-start on THOSE is the **intended** behavior: the presence of `sprint.txt` IS already the authorization to start.
+
+⚠️ Do **NOT** apply the general STEP 5B checkpoint here (which stops everything to wait for confirmation): with `sprint.txt` present you do NOT wait for confirmation **on the open in-repo items**. The **targeted confirmation of user-gated/external items** introduced above is a different thing — not the 5B checkpoint, it's the reconciliation that avoids "executing" an item the user already closed out of session (a script can't know that). (If a single item requires `/add-task` because the requirements aren't clear, apply that ceremony for THAT item — but don't stop the whole sprint.)
 
 **MANDATORY OUTPUT:**
 ```
