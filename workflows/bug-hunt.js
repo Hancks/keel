@@ -8,8 +8,7 @@ export const meta = {
 }
 
 // ---- input (from the command's args) ----
-// explicit empty array = "flows-only" mode (0 lenses): respect it. Default 2 lenses only if lenses is absent.
-const lenses = (args && Array.isArray(args.lenses)) ? args.lenses : ['correctness', 'robustness']
+const lenses = (args && Array.isArray(args.lenses) && args.lenses.length) ? args.lenses : ['correctness', 'robustness']
 const targetFiles = (args && Array.isArray(args.targetFiles)) ? args.targetFiles : []
 const targetLabel = (args && args.targetLabel) || (targetFiles.length ? targetFiles.join(', ') : '(whole project)')
 const exposureModel = (args && args.exposureModel) || 'unknown'

@@ -1,7 +1,7 @@
 # bug-hunt-method — The bug-hunt methodology (keel)
 
 > Canonical source of the methodology. Cited by `commands/bug-hunt.md` and `agents/bug-finder.md` (single source, not duplicated in the prompts).
-> Two parts: **(A) 5 canonical lenses** (pattern-based) · **(B) functional-flow lenses** via the **expected-result method**, including the **6 standard product flows** (chat · tasks · money/seats · documents · rules · memory). The command runs **5 (lenses) / 6 (flows) / 11 (all)** agents.
+> Two parts: **(A) 5 canonical lenses** (pattern-based) · **(B) functional-flow lenses** via the **expected-result method**.
 
 ---
 
@@ -45,20 +45,6 @@ OBTAINED      →  what the real code actually produces
 The **expected** comes from **intent** (design-log / spec / user), **not** from the current behavior of the implementation under test. If you take what the code does *today* **as** the expected, you're certifying the bug as correct: the test proves itself right (fixture built on the code's own assumption).
 - The code tells you *what it's meant to do* (intent) and *what it actually does* (obtained) — never to **define** the expected.
 - When the expected rests **only** on an assumption derived from the code (no design-log/spec/user backing it) → **mark it "assumed, unverified"** in the report. A "clean" run does not prove the code is correct: it only proves it holds against the expecteds we managed to anchor.
-
-### The 6 standard product flows (numbered 6–11, after the 5 lenses)
-For an AI-SaaS product the recurring flows are **six** — the **product paths from start to finish**. The command offers them as a fixed set; for each, the EXPECTED is derived from the design-log of the project's **specific area** (adapt the names to the product):
-
-| # | Flow | Path (start → end) | Invariants to verify |
-|---|---|---|---|
-| 6 | **chat** | user message → routing/decider → LLM provider (streaming) → memory/lessons | correct answer · no charge on a failed call · guardrails applied · no loss mid-stream |
-| 7 | **durable-tasks** | agent/chain start → steps → checkpoint/resume → output | idempotency (resume without re-charge) · server-driven state · no lost/double steps |
-| 8 | **money-seats** | purchase/consume → spend-gate → charge → balance & seats | never over balance · never double-charge · seats consistent with the payment provider · freeze what's paid |
-| 9 | **documents** | upload → extraction/OCR → chunk → embedding → search (RAG) | per-org isolation · every cost metered (no off-book OCR) · correct, attributed search |
-| 10 | **rules-blocks** | inviolable prompts → input check → output check | not bypassable · applied to EVERY call (including internal/backup) |
-| 11 | **ai-memory** | extraction → review → scope (user/mood/org/platform) → re-injection | per-scope isolation · no cross-leak · no loss on empty response |
-
-The `/bug-hunt` command asks the breadth: **5** (lenses only) · **6** (flows only) · **11** (all). An area absent from the project → **skip** that flow (say so in the report).
 
 ---
 

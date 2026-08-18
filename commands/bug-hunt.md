@@ -18,53 +18,36 @@ Run by the **top-level** agent (which owns the `Workflow` tool; sub-agents don't
 
 If the user runs `/bug-hunt help` (or `--help`), **do NOT launch anything**: declare the methodology and stop. Print:
 - The **5 canonical lenses** (with what each looks for): `correctness` (does it do what it promises?) · `robustness` (holds up to errors/edges/interruptions?) · `security` (what's exposed/forgeable?) · `permissions` (who can do what, in the right context?) · `data` (coherent, atomic writes?).
-- The **6 product flows** (end-to-end paths, expected-result method): `chat · durable-tasks · money-seats · documents · rules-blocks · ai-memory`. Each follows `object → preconditions → sequence → EXPECTED (from intent) → OBTAINED (from code) → expected≠obtained ⇒ bug`; the expected is **anchored to design-log/spec**, never to the code under test.
-- The hunt runs at **5 (lenses) / 6 (flows) / 11 (all)** agents — the command asks (STEP 1).
+- The **functional-flow lenses** (expected-result method): `object → preconditions → sequence → EXPECTED (from intent) → OBTAINED (from code) → expected ≠ obtained ⇒ bug`; flows are derived from design-logs + code + user Q&A; the expected is **anchored to intent**, never to the code under test.
 - The **optional extras** (non-bug, validated): `dead-code · efficiency · requirements`.
 - Point to `principi/bug-hunt-method.md` for the detail.
 
-## STEP 1 — How many agents? (5 lenses / 6 flows / 11 all)
+## STEP 1 — Choose the lenses (menu)
 
-Ask with **AskUserQuestion** (single-select) the breadth of the hunt:
+The **5 canonical lenses** (always offered) + 3 optional extras. Ask with **AskUserQuestion** (multiSelect) which to enable:
 
-| Choice | What it launches | When |
-|---|---|---|
-| **5 — technical lenses** | the 5 pattern lenses (`correctness·robustness·security·permissions·data`) | the classic "what's broken/exposed" pass on the touched code |
-| **6 — product flows** | the 6 end-to-end flows (`chat·durable-tasks·money-seats·documents·rules-blocks·ai-memory`), expected-result method | check that the product's **paths** do what they must |
-| **11 — all** | the 5 lenses **+** the 6 flows | full pass (more costly) |
-
-Map the choice like this:
-- **5** → `lenses` = the 5 canonical · `functionalFlows` = `[]`.
-- **6** → `lenses` = `[]` · `functionalFlows` = the 6 flows (STEP 1.5).
-- **11** → `lenses` = 5 · `functionalFlows` = 6.
-
-The user can narrow to a subset with "Other" (e.g. "only money-seats + permissions"). If `$ARGUMENTS` already contains a choice/lenses/flows, use it and skip the question. The **3 optional extras** (non-bug, validated): `dead-code · efficiency · requirements` — only if the user asks (and `requirements` only with a real requirements source).
-
-### The 5 technical lenses (pattern)
 | Lens | Looks for | Mode |
 |---|---|---|
-| `correctness` | logic that doesn't do what it promises | bug |
-| `robustness` | what-if: fail halfway, network down, empty/huge input, constant-value-that-changes | bug |
-| `security` | injection, secrets, unvalidated input, SSRF/path traversal | bug |
-| `permissions` | missing/bypassable authz, isolation, IDOR | bug |
-| `data` | loss/corruption, non-atomicity, derived-vs-recorded state | bug |
+| `correctness` ⭐ | logic that doesn't do what it promises | bug |
+| `robustness` ⭐ | what-if: fail halfway, network down, empty/huge input, constant-value-that-changes | bug |
+| `security` ⭐ | injection, secrets, unvalidated input, SSRF/path traversal | bug |
+| `permissions` ⭐ | missing/bypassable authz, isolation, IDOR | bug |
+| `data` ⭐ | loss/corruption, non-atomicity, derived-vs-recorded state | bug |
+| `dead-code` | functions/branches never reached | validation |
+| `efficiency` | material redundant work (hot path) | validation |
+| `requirements` | where the code violates the requirements source | validation |
 
-## STEP 1.5 — The 6 product flows (expected-result method)
+⭐ = the 5 canonical ones. If the user passed lenses as arguments (`$ARGUMENTS`), use them and skip the menu.
 
-If the choice is **6** or **11**, launch one finder for each of these **6 flows** — product paths **from start to finish**. Each uses the expected-result method (`object → preconditions → sequence → EXPECTED from intent → OBTAINED from code → expected≠obtained ⇒ bug`), with the EXPECTED **derived from design-logs/NORTH_STAR/spec** of the area, NEVER from the code under test.
+## STEP 1.5 — Functional-flow lenses (expected-result method) — recommended for correctness
 
-| # | Flow (`label`) | The path (start → end) | What must hold |
-|---|---|---|---|
-| 6 | **`chat`** | user message → routing/decider → LLM provider (streaming) → memory/lessons extraction | correct answer · **no charge on a failed call** · guardrails applied · no loss mid-stream |
-| 7 | **`durable-tasks`** | task/agent start → chain of steps → checkpoint/resume → output | **idempotency** (resume without re-charge) · server-driven state · no lost/double steps |
-| 8 | **`money-seats`** | purchase/consume → spend-gate → charge → balance & seats (Stripe) | **never over balance · never double-charge** · seats consistent with Stripe · freeze what's paid |
-| 9 | **`documents`** | upload → extraction/OCR → chunk → embedding → RAG search | **per-org isolation** · every cost charged (through the meter, no off-book OCR) · correct, attributed search |
-| 10 | **`rules-blocks`** | inviolable platform prompts → input check → output check | **not bypassable** · applied to EVERY call (including internal/backup) |
-| 11 | **`ai-memory`** | extraction → review → scope (user/mood/org/platform) → re-injection | **per-scope isolation · no cross-leak** between orgs/users · no loss on empty response |
+Beyond the pattern lenses, generate **functional-flow lenses**: one test per flow, with `object → preconditions → sequence → expected → obtained` (see `principi/bug-hunt-method.md`). Procedure:
+1. **Derive the flows** from the 3 sources: (a) **design logs / spec** (`design-log/*.md`, NORTH_STAR, README); (b) **code** (to reconstruct intent and the entry points); (c) hold them as a proposal.
+2. **Confirm/integrate with the user** (AskUserQuestion): present the derived flows (name + expected in one line), the user confirms / integrates / cuts. Cap to the most important ones (it's "light").
+3. For each confirmed flow build `{ label, spec }` where `spec` = the **expected anchored to intent** + the source it comes from (design-log/spec/user). If the expected rests only on the code → mark it "assumed".
+4. Pass them to the engine as `functionalFlows` (STEP 4). Each becomes a **separate finder**.
 
-For each, build `{ label, spec }` where `spec` = the path above **+** the EXPECTED anchored to intent (derive it from the area's design-log; if you get it only from the code, mark it "assumed"). Pass the 6 (or the chosen subset) as `functionalFlows` at STEP 4 — each becomes a **separate finder**.
-
-If an area doesn't exist in this project (e.g. no durable tasks), **skip that flow** and say so in the report. If no requirements are derivable for a flow and the user provides none → don't invent the expected: skip it.
+If no requirements are derivable and the user provides none → **skip the functional flows** (don't invent the expected) and proceed with the pattern lenses only, stating so in the report.
 
 ## STEP 2 — Target (default = current diff → whole files)
 
