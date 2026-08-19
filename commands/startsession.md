@@ -82,60 +82,64 @@ Returns JSON `{markers: [...], file_locks: [...]}`. Schema of each marker:
 
 `.locks/` lives in the **repo root** (NOT in `design-log/`) and is in `.gitignore`. The script creates it automatically if missing.
 
-#### 0.5b: Decide the mode based on the markers found
+#### 0.5b: Decide the mode — decision tree via `session-advise` (keel #1)
 
-**Case A — No marker present:**
-Create your own `exclusive` marker:
+> Cooperative model: the session **NAME** is the signal of a parallel/shared session. `session-advise` **reaps first** the orphan markers (dead or recycled pid, same-host) — so orphan-vs-live is **detected**, no questions about crashed sessions — then advises the mode on the LIVE markers. `/startsession` accepts an optional argument: **`/startsession [<name>]`**.
+
+Determine the **name** (if the user invoked `/startsession <name>`, that; otherwise empty) and run:
+```bash
+# NAME = /startsession argument (empty string if absent)
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh session-advise "<NAME>"
+```
+
+`session-advise` has already **reaped** the orphan markers. Also recover their un-merged **temps** (janitor F/R2 — so the work of a crashed shared session isn't lost):
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh recover-temps   # merges orphan work/ into the canonical (3-way); recovered_temps=0 if none
+```
+
+It returns `verdict=...` (+ an optional `name=...`). Act on the `verdict`:
+
+**`EXCLUSIVE`** (no live marker) → an **exclusive/solo** marker (write the method files **directly** into the canonical; sprint = `sprint.txt`):
 ```bash
 # SESSION_UID, not UID: in zsh UID is read-only → `UID=$(...)` crashes (bad math expr) and captures nothing
 SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init); echo "$SESSION_UID"
 ```
+OUTPUT: `🟢 No active session — EXCLUSIVE marker · ✅ .locks/session-$SESSION_UID.json · 🆔 $SESSION_UID`
 
-OUTPUT:
-```
-🟢 No active session — creating an EXCLUSIVE marker
-✅ .locks/session-{uid}.json
-🆔 UID: {uid}
-```
-
-**Case B — Only `shared` markers exist:**
-Compute the union of the `lockedFiles` of all shared markers + the per-file `.lock`s (from the `lock.sh status` JSON).
-
-OUTPUT:
-```
-🔄 [N] SHARED session(s) active:
-  • UID xxx (host yyy, started zzz) — files: a, b
-  • UID www (host kkk, started qqq) — files: c
-🔒 Locked files (union): a, b, c
-
-I create my own EXCLUSIVE marker anyway (to enter shared mode you need
-an explicit /startsharedsession).
-⚠️ I will NOT modify any file present in the union of the locked ones.
-```
-Then create the marker as in Case A:
+**`SHARED_NAMED`** (you passed a name) **or** **`SHARED_ADOPT`** (no name, but a **single** free sprint-slot → `session-advise` proposes `name=<X>`) → a **shared+named** marker + a **base snapshot** of the method files (temp for the 3-way merge at `/savesession`):
 ```bash
-# SESSION_UID, not UID: in zsh UID is read-only → `UID=$(...)` crashes (bad math expr) and captures nothing
-SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init); echo "$SESSION_UID"
+NAME="<name from the verdict>"
+SESSION_UID=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh init --name "$NAME"); echo "$SESSION_UID"
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh shared-begin "$SESSION_UID"
 ```
+**ALWAYS ANNOUNCE** (never a silent adoption — R.7/1A):
+```
+🔗 SHARED session «$NAME» — 🆔 $SESSION_UID
+   sprint: sprint-$NAME.txt · METHOD files on temp (merged at /savesession)
+   [if SHARED_ADOPT: (adopted the free sprint slot «$NAME»)]
+```
+> If `init --name` fails with `ERROR: name '<name>' already claimed` (race on the same name) → pick a different name or ask the user, then repeat.
 
-**Case C — At least one `exclusive` marker (besides any shared ones):**
-⛔ Another exclusive session is already active. Do NOT create any marker.
+**`SHARED_ASK`** (a live shared context but the name is not uniquely derivable) → **ASK for the name**:
+```
+🔀 There are active shared sessions but I can't derive a unique name.
+   What name does this session start with? (e.g. «alice», «fix-auth»)
+```
+Once you have the name, re-run `session-advise "<name>"` (→ `SHARED_NAMED`) and proceed as above.
 
-OUTPUT:
+**`READ_ONLY`** (another **live exclusive**, with no name) → **READ-ONLY MODE**, do NOT create a marker:
 ```
 ⛔ EXCLUSIVE SESSION ALREADY ACTIVE — entering READ-ONLY MODE
-Marker detected:
-  • UID xxx (host yyy, started zzz, type: exclusive)
-
-⚠️ For the rest of this session:
-  • I do NOT create my own marker
-  • I do NOT modify ANY file (no Edit/Write/Bash with effects)
-  • I can only read, explain, answer
-
-If you know the session is orphaned (Claude crashed), remove the
-marker manually and restart /startsession:
-  rm .locks/session-{uid}.json
+   • I do NOT create my own marker · I do NOT modify ANY file · read/answer only
 ```
+> Orphans have **already** been reaped by `session-advise`: if you see READ_ONLY, the other exclusive is **alive** (live pid). No need to remove markers by hand.
+
+**`BLOCKED_BY_EXCLUSIVE`** (you passed a name BUT there is a live exclusive) → you don't go parallel with an exclusive:
+```
+⛔ You asked for a shared session «<name>» but there is a LIVE exclusive.
+   I won't go parallel: I'll wait for it to close, or proceed READ-ONLY. Which do you prefer?
+```
+**STOP and ask.**
 
 #### 0.5c: Store your own UID in the conversation
 
@@ -711,11 +715,16 @@ Show the user that you UNDERSTOOD the context.
 
 ###STEP 5A: SPRINT FILE EXISTS → AUTO-START (no confirmation asked):
 
-If a `sprint.txt` file exists, **read it in full**.
-
-**Before auto-starting, verify the sprint is not STALE** (script-based detection, since 2026-08-03 — before, the end-of-session prune was prose only and got skipped):
+**Sprint-per-name (keel #1):** the sprint file depends on the session name decided at STEP 0.5b — exclusive/solo → `sprint.txt`; shared+named «X» → `sprint-X.txt`. Resolve it:
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-check
+# NAME = THIS session's name (empty string if exclusive/solo)
+SPRINT_FILE=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-file "<NAME>")   # → sprint.txt | sprint-<NAME>.txt
+```
+If `$SPRINT_FILE` **exists**, **read it in full**. (If it does not → no auto-start: go to STEP 5B.)
+
+**Before auto-starting, verify the sprint is not STALE** (script-based detection, since 2026-08-03 — before, the end-of-session prune was prose only and got skipped; pass the file for your own name):
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-check "$SPRINT_FILE"
 ```
 > ⚠️ **FRESH ≠ "items still open" (2026-08-05).** `sprint-check` tells you **only** whether the last session pruned the sprint (UID match); it does **not** verify the items are still open. The user can close items **out of session** (publish, file a submission, run a field-test) → no new session log → the UID still matches → **FRESH "forever" on stale content**. That's why the script now prints `reconcile=REQUIRED`: reconciliation is **mandatory in every case**.
 

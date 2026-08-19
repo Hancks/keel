@@ -115,7 +115,7 @@ Read `focus_lines` / `focus_bloat` (threshold `focus_bloat_threshold`, default 4
 
 > This exists because `sprint.txt` (which `/startsession` STEP 5A auto-runs) was NOT reviewed at the end of work → it stayed STALE: already-done items still listed, superseded items, state not updated. The next `/startsession` restarts from an old plan (FM1: objective amnesia). It must be **pruned at every close**, like FOCUS.
 
-If `sprint.txt` exists in the project root:
+If the sprint file for THIS session exists (`sprint.txt` if exclusive, `sprint-<name>.txt` if shared+named — resolve it with `${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-file "<NAME>"`):
 1. **Re-read it in full.**
 2. For EACH item, compare it with the real state just synced (2b): done/validated → in `DONE.md`/`FIXED.md`? implemented-not-validated → `TO_TEST.md`? still open? superseded/no longer valid?
 3. **Prune**: REMOVE the completed/validated items and the superseded ones; UPDATE the partial ones to the real state (with a note); keep ONLY what truly remains to do.
@@ -123,7 +123,8 @@ If `sprint.txt` exists in the project root:
 5. The prune **removes/updates, does not add**: new work goes to `TODO.md`, not to the sprint.
 6. **STAMP the prune (MANDATORY — makes the prune script-verifiable, not just skippable prose):** after re-pruning, run
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-mark <MYUID>   # MYUID = THIS session's UID (announced at /startsession STEP 0.5)
+   SPRINT_FILE=$(${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-file "<NAME>")   # sprint.txt | sprint-<NAME>.txt
+   ${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh sprint-mark <MYUID> "$SPRINT_FILE"   # MYUID = THIS session's UID; stamps the file for your own name
    ```
    This writes the `# sprint-pruned-uid: <MYUID>` marker into `sprint.txt`. At the next `/startsession`, `sprint-check` compares that UID with the **most recent session log's** UID: if they don't match (a close skipped the prune) → verdict `SPRINT_STALE` + loud warning. **Do NOT move to STEP 4/5 without running `sprint-mark`** (skip if `sprint.txt` is absent).
 
@@ -287,16 +288,55 @@ After confirmation, write each entry into the right file, the right section.
 
 ---
 
-### STEP 4: Create the session log
+### STEP 4: Create the session log (with an «Execution log») + gate + shared merge
+
+#### 4a: Create the file
 
 Generate a timestamp in the format `YYYY-MM-DD-HH-MM`.
-Create the file `design-log/sessions/[timestamp].md` with the full structure (see METHODOLOGY.md).
+Create the file `design-log/sessions/[timestamp].md` with the full structure (see METHODOLOGY.md and the Template at the end).
+
+**MANDATORY — the «Execution log» block (1A traceability, keel #1):** the log MUST contain an `## Execution log` section with, in honest prose:
+- **Requested**: what the user asked for in this session;
+- **Done**: what was actually completed (validated/implemented);
+- **Not done / partial + why**: what was left behind or half-done, and the reason.
+
+This makes the partial VISIBLE (R.16): the user must be able to validate without guessing what the plugin did. The content is yours (model-level); its **presence** is forced by the 4b gate.
 
 **MANDATORY OUTPUT:**
 ```
 📝 Session log created:
-✅ File: design-log/sessions/[timestamp].md
+✅ File: design-log/sessions/[timestamp].md (includes ## Execution log)
 ```
+
+#### 4b: 🚦 «Execution log» GATE (FORCING — 1A, not skippable)
+
+> Like the `## Antithesis` gate on design logs: the PRESENCE of the log is verified by **script**, not left to goodwill (BEHAVIORS R.1 "you don't follow the method unless forced"). Honesty: the gate buys *presence*, not the *truth* of the content (design log 2026-08-19 § Antithesis/1A).
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh reg-check design-log/sessions/[timestamp].md
+```
+
+- `verdict=REG_PRESENT` → proceed.
+- `verdict=REG_MISSING` → ⛔ **STOP. Add the `## Execution log` block** to the session log (4a), then **re-run `reg-check`** until it says `REG_PRESENT`. Do **NOT** remove the marker (STEP 5) without the log.
+- `verdict=NO_LOG` → the file does not exist: go back to 4a.
+
+**MANDATORY OUTPUT:** `🚦 Execution-log gate: verdict=[REG_PRESENT | REG_MISSING→added→REG_PRESENT]`
+
+#### 4c: 🔀 Merge the METHOD files (only if SHARED — 1B, keel #1)
+
+> A **shared** session wrote its method files (FOCUS/TODO/TO_FIX/TO_TEST/INBOX) into its own **temp** (`shared-begin` at `/startsharedsession`), NOT into the canonical. At close they are merged into the canonical via **3-way merge** (`git merge-file` base/work/theirs). An **exclusive/solo** session already wrote the canonical directly → skip here.
+
+Only if this session is **shared** (marker `type: shared`):
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/lock.sh merge-method <MYUID>
+```
+
+- `merged=N conflicts=0` → the method files are merged into the canonical; the temp (`base/`+`work/`) has been removed.
+- `conflicts>0` (`conflicts_dir=design-log/.conflicts`) → one or more entries were touched **also** by another session: the canonical was **NOT corrupted** (it keeps the other version), your merge-with-markers is **persisted** in `.conflicts/` and must be resolved by the **next** session. Report it in the summary (STEP 6) and in the session-log handoff.
+
+> Note: `merge-method` merges the **method files** (temp→canonical). The per-file **CODE `.lock`s** are a different thing and are released with `/stopsharedsession` (STEP 5b): the merge does NOT touch them.
+
+**MANDATORY OUTPUT:** `🔀 Method merge (shared): merged=[N] conflicts=[K][ → design-log/.conflicts/] | exclusive → skip`
 
 ---
 
@@ -410,6 +450,8 @@ cd "$GLOBAL_DIR" && git rev-parse --git-dir >/dev/null 2>&1 && git add . && git 
 ## Session Log Template (Reference)
 
 The file must contain these sections (see METHODOLOGY.md for details):
+
+- **`## Execution log`** (MANDATORY — forced by the `reg-check` gate in STEP 4b, 1A keel #1): **Requested** → **Done** → **Not done/partial + why**.
 
 1. **Session Summary** - What was done
 2. **CRITICAL SECTIONS**:
