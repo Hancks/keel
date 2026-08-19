@@ -12,7 +12,7 @@
       "name": "keel",
       "source": "./",
       "description": "Keeps a Claude Code agent on course at scale — memory, big picture, real intent, verification, and traceability, via hooks and skills.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": { "name": "Enzo Augieri" },
       "homepage": "https://github.com/Hancks/keel",
       "repository": "https://github.com/Hancks/keel",
