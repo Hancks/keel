@@ -30,7 +30,17 @@ LEARNED_MARKER="$PROJECT_DIR/.locks/learned-write-approved.json"
 if command -v jq >/dev/null 2>&1; then HAS_JQ=1; else HAS_JQ=0; fi
 
 # Observable log: every hook that fires leaves a line (UTC time) → tests check HERE.
-hooklog() { printf '[%s] %s\n' "$(date -u +%FT%TZ 2>/dev/null)" "$1" >> "$HOOKLOG" 2>/dev/null || true; }
+# Only in projects served by the method (design-log/ exists): keel is installed at user scope,
+# so its hooks also fire in plain directories (e.g. $HOME) — they must leave no trace there.
+hooklog() {
+  [ -d "$DL" ] || return 0
+  printf '[%s] %s\n' "$(date -u +%FT%TZ 2>/dev/null)" "$1" >> "$HOOKLOG" 2>/dev/null || true
+}
+
+# Capture verbs (bilingual). Override with KEEL_CAPTURE_VERBS: a '|'-separated list
+# (e.g. "segna|annota|remember"), or "off" to disable the hook capture entirely.
+KEEL_DEFAULT_CAPTURE_VERBS='segna|appunta|annota|ricorda|memorizza|nota|note|remember|jot|capture|remind'
+CAPTURE_VERBS="${KEEL_CAPTURE_VERBS:-$KEEL_DEFAULT_CAPTURE_VERBS}"
 
 project_md() {
   if [ -f "$DL/PROJECT.md" ]; then printf '%s' "$DL/PROJECT.md"
@@ -95,9 +105,13 @@ cmd_hook_userpromptsubmit() {
   local prompt; prompt="$(read_prompt)"
   local ctx="" seg="no"
   # Bilingual capture trigger: the user can say it in Italian or English.
-  if printf '%s' "$prompt" | grep -qiE '(^|[[:space:]])(segna|appunta|annota|ricorda|memorizza|nota|note|remember|jot|capture|remind)([[:space:]]|:|$)' 2>/dev/null; then
+  # Capture ONLY in projects already served by the method (design-log/ exists). Creating
+  # design-log/ here would silently turn any directory (e.g. $HOME) into a keel project and
+  # arm the PreToolUse hard-blocks + the Stop-hook backlog scan there. Scaffolding stays
+  # explicit (/startsession).
+  if [ -d "$DL" ] && [ "$CAPTURE_VERBS" != "off" ] \
+     && printf '%s' "$prompt" | grep -qiE "(^|[[:space:]])(${CAPTURE_VERBS})([[:space:]]|:|\$)" 2>/dev/null; then
     seg="yes"
-    mkdir -p "$DL" 2>/dev/null
     [ -f "$DL/INBOX.md" ] || printf '# 📥 INBOX — Raw capture (to triage)\n\n## To triage\n\n' > "$DL/INBOX.md"
     # drop the *(empty)* placeholder if present, otherwise it stays next to the captures
     if grep -qE '^[[:space:]]*\*\(empty\)\*[[:space:]]*$' "$DL/INBOX.md" 2>/dev/null; then
