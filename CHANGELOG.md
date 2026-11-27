@@ -2,6 +2,17 @@
 
 All notable changes to keel are documented here. Versions are simple `MAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### Fixed
+- **Capture no longer turns any directory into a keel project.** With keel installed at user scope, a prompt containing a capture verb (e.g. "note", or the very common Italian "nota") in a plain directory such as `$HOME` ran `mkdir -p design-log`. From then on that directory looked like a keel project: edits were hard-blocked ("no active session"), the Stop hook demanded triage, and the end-of-turn backlog scan grepped the whole directory tree (in `$HOME`: thousands of markers, a multi-MB `.code-backlog.md`). The hook now captures only when `design-log/` already exists; scaffolding stays explicit (`/startsession`).
+- **No hook log outside keel projects.** `.claude-designlog-hooks.log` is written only where `design-log/` exists.
+- **A bare `design-log/` no longer makes a keel project.** The hooks now recognize a keel project by `design-log/PROJECT.md` (always created by `/startsession`, and the marker the dashboard already uses), not by the mere folder. Before, any directory with its own `design-log/` — including the keel plugin repo itself, which ships `design-log/BEHAVIORS.md` and `METHODOLOGY.md` — had every `Edit`/`Write` hard-blocked ("no active session"), a hook log written into it and the backlog scan run on it.
+- **`KEEL_CAPTURE_VERBS` is normalized.** Whitespace is ignored (`segna | annota` works; before, it silently matched nothing), empty entries are dropped, `off` is case-insensitive, and a list that ends up empty falls back to the defaults.
+
+### Added
+- **`KEEL_CAPTURE_VERBS`** — override the capture verbs with a `|`-separated list, or set it to `off` to disable the hook capture.
+
 ## 0.3.0 — Cooperative sessions & traceability
 
 Two or more Claude sessions can now work the same repository at once without stepping on each other, and every session leaves an auditable trail. The old failure modes this closes: an "eternal close" when two sessions edited the same tracking files, and questions about sessions that had simply crashed.

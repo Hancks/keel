@@ -29,8 +29,30 @@ LEARNED_MARKER="$PROJECT_DIR/.locks/learned-write-approved.json"
 
 if command -v jq >/dev/null 2>&1; then HAS_JQ=1; else HAS_JQ=0; fi
 
+# Is this directory a project served by the method? keel is installed at user scope, so its
+# hooks fire everywhere: they must act (and leave a trace) ONLY in keel projects. A bare
+# design-log/ is NOT enough — the keel plugin repo itself ships one (BEHAVIORS.md, METHODOLOGY.md)
+# and other projects may have their own. The marker is design-log/PROJECT.md: always created by
+# `scaffold` (/startsession), and the same marker the dashboard uses (scripts/dashboard.py).
+is_keel_project() { [ -f "$DL/PROJECT.md" ]; }
+
 # Observable log: every hook that fires leaves a line (UTC time) → tests check HERE.
-hooklog() { printf '[%s] %s\n' "$(date -u +%FT%TZ 2>/dev/null)" "$1" >> "$HOOKLOG" 2>/dev/null || true; }
+# Only in keel projects — no trace in plain directories (e.g. $HOME).
+hooklog() {
+  is_keel_project || return 0
+  printf '[%s] %s\n' "$(date -u +%FT%TZ 2>/dev/null)" "$1" >> "$HOOKLOG" 2>/dev/null || true
+}
+
+# Capture verbs (bilingual). Override with KEEL_CAPTURE_VERBS: a '|'-separated list
+# (e.g. "segna|annota|remember"), or "off" to disable the hook capture entirely.
+# Normalized: whitespace is ignored ("segna | annota" works), empty entries are dropped,
+# "off" is case-insensitive. A list that ends up empty falls back to the defaults.
+KEEL_DEFAULT_CAPTURE_VERBS='segna|appunta|annota|ricorda|memorizza|nota|note|remember|jot|capture|remind'
+CAPTURE_VERBS="$(printf '%s' "${KEEL_CAPTURE_VERBS:-}" | tr -d '[:space:]' | tr -s '|' | sed 's/^|//; s/|$//')"
+case "$(printf '%s' "$CAPTURE_VERBS" | tr '[:upper:]' '[:lower:]')" in
+  off) CAPTURE_VERBS="off" ;;
+  "")  CAPTURE_VERBS="$KEEL_DEFAULT_CAPTURE_VERBS" ;;
+esac
 
 project_md() {
   if [ -f "$DL/PROJECT.md" ]; then printf '%s' "$DL/PROJECT.md"
@@ -95,9 +117,12 @@ cmd_hook_userpromptsubmit() {
   local prompt; prompt="$(read_prompt)"
   local ctx="" seg="no"
   # Bilingual capture trigger: the user can say it in Italian or English.
-  if printf '%s' "$prompt" | grep -qiE '(^|[[:space:]])(segna|appunta|annota|ricorda|memorizza|nota|note|remember|jot|capture|remind)([[:space:]]|:|$)' 2>/dev/null; then
+  # Capture ONLY in keel projects (is_keel_project). Creating design-log/ here would silently
+  # turn any directory (e.g. $HOME) into a keel project and arm the PreToolUse hard-blocks +
+  # the Stop-hook backlog scan there. Scaffolding stays explicit (/startsession).
+  if is_keel_project && [ "$CAPTURE_VERBS" != "off" ] \
+     && printf '%s' "$prompt" | grep -qiE "(^|[[:space:]])(${CAPTURE_VERBS})([[:space:]]|:|\$)" 2>/dev/null; then
     seg="yes"
-    mkdir -p "$DL" 2>/dev/null
     [ -f "$DL/INBOX.md" ] || printf '# 📥 INBOX — Raw capture (to triage)\n\n## To triage\n\n' > "$DL/INBOX.md"
     # drop the *(empty)* placeholder if present, otherwise it stays next to the captures
     if grep -qE '^[[:space:]]*\*\(empty\)\*[[:space:]]*$' "$DL/INBOX.md" 2>/dev/null; then
@@ -201,8 +226,8 @@ except Exception: pass' 2>/dev/null)"
 try: print(json.load(sys.stdin).get("session_id",""))
 except Exception: pass' 2>/dev/null)"
   fi
-  # Enforce ONLY on projects served by the method (design-log/ exists).
-  [ -d "$DL" ] || { hooklog "PreToolUse (no design-log) → ALLOW"; exit 0; }
+  # Enforce ONLY on keel projects (is_keel_project).
+  is_keel_project || exit 0
   # (i) R.1 — session marker required.
   if ! ls "$PROJECT_DIR"/.locks/session-*.json >/dev/null 2>&1; then
     deny "Design-Log (R.1): no active session in .locks/. Run /startsession before editing files."
@@ -272,10 +297,10 @@ cmd_hook_precompact() {
 
 # backlog-scan — surface the backlog IN THE CODE (Q2/G, keel #1): TODO/FIXME/KEEL: markers
 # → design-log/.code-backlog.md as file:line. "done" = removing the comment in the diff (no separate
-# tracking). Only projects served by the method (design-log/ exists). Bounded so it does not weigh on
+# tracking). Only keel projects (is_keel_project). Bounded so it does not weigh on
 # the turn (R5): excludes on vcs/vendor/build + cap; code scan → excludes design-log/ (bookkeeping).
 cmd_backlog_scan() {
-  [ -d "$DL" ] || return 0
+  is_keel_project || return 0
   local out="$DL/.code-backlog.md" cap=200 tmp
   tmp=$(mktemp 2>/dev/null) || return 0
   grep -rInE 'TODO|FIXME|KEEL:' "$PROJECT_DIR" \
@@ -302,7 +327,7 @@ cmd_backlog_scan() {
 
 cmd_hook_stop() {
   cat >/dev/null 2>&1 || true
-  [ -d "$DL" ] || exit 0
+  is_keel_project || exit 0
   local untriaged=0
   if [ -f "$DL/INBOX.md" ]; then
     untriaged="$(grep -cE '^[[:space:]]*- \[ \]' "$DL/INBOX.md" 2>/dev/null || true)"; untriaged=${untriaged:-0}
@@ -364,7 +389,7 @@ except Exception: pass' 2>/dev/null)"
 try: print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))
 except Exception: pass' 2>/dev/null)"
   fi
-  [ -d "$DL" ] || exit 0
+  is_keel_project || exit 0
   # Refresh the GUARDIAN when a new DATED design-log is CREATED (= a task started).
   # Only the Write tool (creation), not Edit → one injection per new task.
   case "$fp" in
